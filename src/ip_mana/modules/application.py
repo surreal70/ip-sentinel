@@ -3,8 +3,11 @@ Application Integration Module (Module 4) for enterprise application queries.
 """
 
 from abc import ABC, abstractmethod
-from ipaddress import IPAddress
-from typing import Dict
+from ipaddress import IPv4Address, IPv6Address
+from typing import Dict, Union
+
+# Type alias for IP addresses
+IPAddress = Union[IPv4Address, IPv6Address]
 
 
 class ApplicationSubmodule(ABC):
