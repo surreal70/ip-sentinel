@@ -1,0 +1,27 @@
+# Core dependencies for IP Intelligence Analyzer
+# IP address handling and network operations
+netaddr>=0.8.0
+ipwhois>=1.2.0
+python-nmap>=0.7.1
+
+# SSL/TLS analysis
+sslyze>=5.0.0
+
+# HTTP requests for API calls
+requests>=2.28.0
+
+# Database
+# SQLite is built into Python, no additional dependency needed
+
+# Testing framework
+pytest>=7.0.0
+hypothesis>=6.0.0
+
+# Code quality and formatting (development)
+black>=22.0.0
+flake8>=5.0.0
+isort>=5.10.0
+
+# Optional: For better CLI experience
+click>=8.0.0
+colorama>=0.4.0
