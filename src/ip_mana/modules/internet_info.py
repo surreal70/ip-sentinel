@@ -89,12 +89,13 @@ class InternetInfoModule:
             '8.8.4.4'   # Google secondary
         ]
 
-    def analyze(self, ip: IPAddress) -> Dict:
+    def analyze(self, ip: IPAddress, mode: str = "dense") -> Dict:
         """
         Perform comprehensive internet-based analysis.
 
         Args:
             ip: IPAddress object to analyze
+            mode: Reporting mode ("dense", "full", "full-err")
 
         Returns:
             Dictionary containing all internet analysis results
@@ -116,6 +117,9 @@ class InternetInfoModule:
         # Check blocklists
         blocklist_results = self.check_blocklists(ip)
         
+        # Filter blocklist results based on mode (Requirements 8.11, 8.12)
+        filtered_blocklist_results = self._filter_blocklist_results(blocklist_results, mode)
+        
         # Calculate reputation score
         reputation_score = self._calculate_reputation_score(blocklist_results)
         
@@ -124,7 +128,7 @@ class InternetInfoModule:
             "whois_data": self._whois_to_dict(whois_data),
             "geolocation": self._geolocation_to_dict(geolocation),
             "asn_info": self._asn_to_dict(asn_info),
-            "blocklist_results": [self._blocklist_to_dict(bl) for bl in blocklist_results],
+            "blocklist_results": [self._blocklist_to_dict(bl) for bl in filtered_blocklist_results],
             "reputation_score": reputation_score,
             "reverse_dns": reverse_dns
         }
@@ -461,6 +465,24 @@ class InternetInfoModule:
             ))
         
         return results
+
+    def _filter_blocklist_results(self, blocklist_results: List[BlocklistResult], mode: str) -> List[BlocklistResult]:
+        """
+        Filter blocklist results based on reporting mode.
+        
+        Args:
+            blocklist_results: List of all blocklist check results
+            mode: Reporting mode ("dense", "full", "full-err")
+            
+        Returns:
+            Filtered list of blocklist results according to mode requirements
+        """
+        if mode == "dense":
+            # Requirement 8.11: In dense mode, show only positive findings for blocklist checks
+            return [result for result in blocklist_results if result.listed]
+        else:
+            # Requirement 8.12: In full mode, show all blocklist check results
+            return blocklist_results
 
     def _calculate_reputation_score(self, blocklist_results: List[BlocklistResult]) -> Optional[float]:
         """

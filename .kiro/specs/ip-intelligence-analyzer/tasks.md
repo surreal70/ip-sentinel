@@ -157,7 +157,7 @@ This implementation plan follows the Python development framework standards and 
   - **Property 18: Internet Information Gathering Completeness**
   - **Validates: Requirements 8.3, 8.4, 8.5, 8.6, 8.10**
 
-- [ ] 11. Add reputation and blocklist checking to Internet Module
+- [x] 11. Add reputation and blocklist checking to Internet Module
   - Implement spam list checking with multiple providers
   - Add DNS blocklist query functionality
   - Integrate CrowdSec database checking
@@ -165,7 +165,7 @@ This implementation plan follows the Python development framework standards and 
   - Implement mode-specific result filtering (dense vs full)
   - _Requirements: 8.7, 8.8, 8.9, 8.11, 8.12_
 
-- [ ] 11.1 Write property test for reputation checking behavior
+- [x] 11.1 Write property test for reputation checking behavior
   - **Property 19: Reputation Checking Behavior**
   - **Validates: Requirements 8.7, 8.8, 8.9, 8.11, 8.12**
 
