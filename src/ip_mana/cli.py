@@ -83,6 +83,11 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Configuration options
     parser.add_argument("--config", type=str, help="Configuration file path")
+    parser.add_argument(
+        "--credentials", 
+        type=str, 
+        help="Application Module credential file path (default: config/app_credentials.json)"
+    )
 
     # Classification management
     parser.add_argument(

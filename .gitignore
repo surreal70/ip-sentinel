@@ -171,6 +171,9 @@ ip_analysis.db
 config.json
 classifications.json
 
+# Credential files (security)
+config/app_credentials.json
+
 # Temporary files
 *.tmp
 *.temp
