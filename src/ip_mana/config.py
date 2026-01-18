@@ -64,7 +64,10 @@ class Config:
 class ConfigManager:
     """Manages application configuration and classification rules."""
 
-    def __init__(self, config_path: Optional[Path] = None, classifications_path: Optional[Path] = None):
+    def __init__(
+            self,
+            config_path: Optional[Path] = None,
+            classifications_path: Optional[Path] = None):
         """Initialize configuration manager."""
         self.config_path = config_path or Path("config.json")
         self.classifications_path = classifications_path or Path("classifications.json")
@@ -73,15 +76,15 @@ class ConfigManager:
         """Load configuration from file or create default."""
         if not self.config_path.exists():
             return Config()
-        
+
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             # Convert database_path string back to Path if present
             if data.get('database_path'):
                 data['database_path'] = Path(data['database_path'])
-            
+
             return Config(**data)
         except (json.JSONDecodeError, TypeError, ValueError) as e:
             raise ValueError(f"Invalid configuration file format: {e}")
@@ -89,11 +92,11 @@ class ConfigManager:
     def save_config(self, config: Config) -> None:
         """Save configuration to file."""
         data = asdict(config)
-        
+
         # Convert Path objects to strings for JSON serialization
         if data.get('database_path'):
             data['database_path'] = str(data['database_path'])
-        
+
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -107,15 +110,15 @@ class ConfigManager:
             default_rules = self._create_default_classifications()
             self.save_classifications(default_rules)
             return default_rules
-        
+
         try:
             with open(self.classifications_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             rules = {}
             for name, rule_data in data.items():
                 rules[name] = ClassificationRule.from_dict(rule_data)
-            
+
             return rules
         except (json.JSONDecodeError, TypeError, ValueError, KeyError) as e:
             raise ValueError(f"Invalid classifications file format: {e}")
@@ -125,7 +128,7 @@ class ConfigManager:
         data = {}
         for name, rule in rules.items():
             data[name] = rule.to_dict()
-        
+
         try:
             with open(self.classifications_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -139,14 +142,14 @@ class ConfigManager:
             ipaddress.ip_network(rule.ip_range, strict=False)
         except ValueError as e:
             raise ValueError(f"Invalid IP range format '{rule.ip_range}': {e}")
-        
+
         # Validate qualifies_for modules
-        valid_modules = ["local_info", "internet_info", "netbox", "checkmk", 
-                        "openitcockpit", "openvas", "infoblox"]
+        valid_modules = ["local_info", "internet_info", "netbox", "checkmk",
+                         "openitcockpit", "openvas", "infoblox"]
         for module in rule.qualifies_for:
             if module not in valid_modules:
                 raise ValueError(f"Invalid module name '{module}' in qualifies_for")
-        
+
         rules = self.load_classifications()
         rules[rule.name] = rule
         self.save_classifications(rules)
@@ -156,29 +159,32 @@ class ConfigManager:
         rules = self.load_classifications()
         if rule_name not in rules:
             return False
-        
+
         del rules[rule_name]
         self.save_classifications(rules)
         return True
 
-    def update_classification(self, rule_name: str, updated_rule: ClassificationRule) -> bool:
+    def update_classification(
+            self,
+            rule_name: str,
+            updated_rule: ClassificationRule) -> bool:
         """Update an existing classification rule."""
         rules = self.load_classifications()
         if rule_name not in rules:
             return False
-        
+
         # Validate the updated rule
         try:
             ipaddress.ip_network(updated_rule.ip_range, strict=False)
         except ValueError as e:
             raise ValueError(f"Invalid IP range format '{updated_rule.ip_range}': {e}")
-        
-        valid_modules = ["local_info", "internet_info", "netbox", "checkmk", 
-                        "openitcockpit", "openvas", "infoblox"]
+
+        valid_modules = ["local_info", "internet_info", "netbox", "checkmk",
+                         "openitcockpit", "openvas", "infoblox"]
         for module in updated_rule.qualifies_for:
             if module not in valid_modules:
                 raise ValueError(f"Invalid module name '{module}' in qualifies_for")
-        
+
         # Remove old rule and add updated one
         del rules[rule_name]
         rules[updated_rule.name] = updated_rule
@@ -280,5 +286,5 @@ class ConfigManager:
                 rfc_reference="RFC 4291"
             )
         }
-        
+
         return default_rules

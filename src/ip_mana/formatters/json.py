@@ -3,7 +3,7 @@ JSON output formatter.
 """
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 from .base import OutputFormatter
 
@@ -23,12 +23,16 @@ class JSONFormatter(OutputFormatter):
         """
         data = self._prepare_result_data(result)
         filtered_data = self._filter_by_verbosity(data)
-        
+
         # Serialize all objects for JSON output
         serialized_data = self._serialize_for_output(filtered_data)
-        
+
         try:
-            return json.dumps(serialized_data, indent=2, ensure_ascii=False, sort_keys=True)
+            return json.dumps(
+                serialized_data,
+                indent=2,
+                ensure_ascii=False,
+                sort_keys=True)
         except (TypeError, ValueError) as e:
             # Fallback for any serialization issues
             error_result = {

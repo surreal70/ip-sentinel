@@ -5,7 +5,6 @@ Feature: ip-intelligence-analyzer, Property 9: Module Availability Validation
 Validates: Requirements 5.4
 """
 
-import pytest
 from hypothesis import given, strategies as st, settings
 from pathlib import Path
 import tempfile
@@ -24,25 +23,25 @@ def module_names_strategy(draw):
         'netbox', 'checkmk', 'openitcockpit', 'openvas', 'infoblox'
     ]
     invalid_modules = ['invalid_module', 'nonexistent', 'fake_module']
-    
+
     # Mix of valid and invalid modules
     valid_count = draw(st.integers(min_value=0, max_value=len(all_modules)))
     invalid_count = draw(st.integers(min_value=0, max_value=3))
-    
+
     valid_selected = draw(st.lists(
         st.sampled_from(all_modules),
         min_size=valid_count,
         max_size=valid_count,
         unique=True
     ))
-    
+
     invalid_selected = draw(st.lists(
         st.sampled_from(invalid_modules),
         min_size=invalid_count,
         max_size=invalid_count,
         unique=True
     ))
-    
+
     return valid_selected + invalid_selected
 
 
@@ -51,33 +50,33 @@ def module_names_strategy(draw):
 def test_module_availability_validation_property(module_names):
     """
     Property 9: Module Availability Validation
-    
+
     For any requested module that is not available or properly configured,
     the application should detect the unavailability before attempting execution
     and handle it gracefully.
-    
+
     Validates: Requirements 5.4
     """
     # Create a minimal config
     config = Config()
-    
+
     # Create analyzer (without credential file for testing)
     analyzer = IPAnalyzer(config=config)
-    
+
     # Validate module availability
     availability = analyzer.validate_module_availability(module_names)
-    
+
     # Property 1: All requested modules should have an availability status
     assert len(availability) == len(module_names), \
         "All requested modules should have availability status"
-    
+
     # Property 2: Core modules should always be available
     core_modules = ['classification', 'local_info', 'internet_info']
     for module in module_names:
         if module in core_modules:
             assert availability.get(module, False) is True, \
                 f"Core module {module} should always be available"
-    
+
     # Property 3: Invalid module names should be marked as unavailable
     valid_modules = [
         'classification', 'local_info', 'internet_info',
@@ -90,10 +89,10 @@ def test_module_availability_validation_property(module_names):
             if module in availability:
                 assert availability[module] is False, \
                     f"Invalid module {module} should be marked unavailable"
-    
+
     # Property 4: Availability check should not raise exceptions
     # (This is implicitly tested by the test not failing)
-    
+
     # Property 5: Application submodules without credentials should be detectable
     app_submodules = ['netbox', 'checkmk', 'openitcockpit', 'openvas', 'infoblox']
     for module in module_names:
@@ -108,10 +107,10 @@ def test_module_availability_with_all_core_modules():
     """Test that all core modules are always available."""
     config = Config()
     analyzer = IPAnalyzer(config=config)
-    
+
     core_modules = ['classification', 'local_info', 'internet_info']
     availability = analyzer.validate_module_availability(core_modules)
-    
+
     for module in core_modules:
         assert availability[module] is True, \
             f"Core module {module} should be available"
@@ -121,10 +120,10 @@ def test_module_availability_with_invalid_modules():
     """Test that invalid modules are handled gracefully."""
     config = Config()
     analyzer = IPAnalyzer(config=config)
-    
+
     invalid_modules = ['invalid_module', 'nonexistent', 'fake_module']
     availability = analyzer.validate_module_availability(invalid_modules)
-    
+
     # Invalid modules should either not appear in results or be marked False
     for module in invalid_modules:
         if module in availability:
@@ -136,9 +135,9 @@ def test_module_availability_empty_list():
     """Test module availability with empty list."""
     config = Config()
     analyzer = IPAnalyzer(config=config)
-    
+
     availability = analyzer.validate_module_availability([])
-    
+
     assert isinstance(availability, dict), \
         "Availability check should return a dictionary"
     assert len(availability) == 0, \
@@ -149,17 +148,17 @@ def test_get_available_modules():
     """Test that get_available_modules returns expected modules."""
     config = Config()
     analyzer = IPAnalyzer(config=config)
-    
+
     available = analyzer.get_available_modules()
-    
+
     # Core modules should always be in the list
     assert 'classification' in available
     assert 'local_info' in available
     assert 'internet_info' in available
-    
+
     # Result should be a list
     assert isinstance(available, list)
-    
+
     # All items should be strings
     assert all(isinstance(m, str) for m in available)
 
@@ -189,19 +188,19 @@ def test_module_availability_with_credentials():
         }
         json.dump(credentials, f)
         credential_file = f.name
-    
+
     try:
         config = Config()
         analyzer = IPAnalyzer(config=config, credential_file=credential_file)
-        
+
         # Check availability of application modules
         app_modules = ['netbox', 'checkmk']
         availability = analyzer.validate_module_availability(app_modules)
-        
+
         # Both should have availability status
         assert 'netbox' in availability
         assert 'checkmk' in availability
-        
+
     finally:
         # Clean up
         Path(credential_file).unlink(missing_ok=True)

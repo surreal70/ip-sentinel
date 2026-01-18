@@ -3,7 +3,7 @@ Base output formatter interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict
 from dataclasses import asdict
 from datetime import datetime
 from ipaddress import IPv4Address, IPv6Address
@@ -39,22 +39,22 @@ class OutputFormatter(ABC):
         Returns:
             Formatted string representation
         """
-        pass
 
     def set_verbosity(self, mode: str) -> None:
         """Set the verbosity mode for output formatting."""
         valid_modes = [VerbosityMode.DENSE, VerbosityMode.FULL, VerbosityMode.FULL_ERR]
         if mode not in valid_modes:
-            raise ValueError(f"Invalid verbosity mode: {mode}. Must be one of {valid_modes}")
+            raise ValueError(
+                f"Invalid verbosity mode: {mode}. Must be one of {valid_modes}")
         self.verbosity_mode = mode
 
     def _prepare_result_data(self, result: Any) -> Dict:
         """
         Convert result object to dictionary format for processing.
-        
+
         Args:
             result: Analysis result object or dictionary
-            
+
         Returns:
             Dictionary representation of the result
         """
@@ -73,10 +73,10 @@ class OutputFormatter(ABC):
     def _filter_by_verbosity(self, data: Dict) -> Dict:
         """
         Filter data based on verbosity mode.
-        
+
         Args:
             data: Raw data dictionary
-            
+
         Returns:
             Filtered data according to verbosity settings
         """
@@ -115,10 +115,10 @@ class OutputFormatter(ABC):
     def _has_meaningful_data(self, value: Any) -> bool:
         """
         Check if a value contains meaningful data.
-        
+
         Args:
             value: Value to check
-            
+
         Returns:
             True if value contains meaningful data, False otherwise
         """
@@ -126,19 +126,21 @@ class OutputFormatter(ABC):
             return False
         if isinstance(value, (str, list, dict)) and len(value) == 0:
             return False
-        if isinstance(value, dict) and all(not self._has_meaningful_data(v) for v in value.values()):
+        if isinstance(value, dict) and all(not self._has_meaningful_data(v)
+                                           for v in value.values()):
             return False
-        if isinstance(value, list) and all(not self._has_meaningful_data(v) for v in value):
+        if isinstance(value, list) and all(not self._has_meaningful_data(v)
+                                           for v in value):
             return False
         return True
 
     def _serialize_for_output(self, obj: Any) -> Any:
         """
         Serialize objects for output formatting.
-        
+
         Args:
             obj: Object to serialize
-            
+
         Returns:
             Serializable representation
         """

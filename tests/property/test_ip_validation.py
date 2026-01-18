@@ -9,7 +9,7 @@ import ipaddress
 from ipaddress import IPv4Address, IPv6Address
 
 import pytest
-from hypothesis import given, assume
+from hypothesis import given
 from hypothesis import strategies as st
 
 from src.ip_mana.ip_handler import IPAddressHandler, IPAddressValidationError
@@ -26,10 +26,10 @@ class TestIPAddressValidation:
         **Validates: Requirements 10.1, 10.3**
         """
         ip_str = str(ip)
-        
+
         # Should validate without raising exception
         result = IPAddressHandler.validate_ip(ip_str)
-        
+
         # Should return IPv4Address object
         assert isinstance(result, IPv4Address)
         assert str(result) == ip_str
@@ -43,10 +43,10 @@ class TestIPAddressValidation:
         **Validates: Requirements 10.1, 10.3**
         """
         ip_str = str(ip)
-        
+
         # Should validate without raising exception
         result = IPAddressHandler.validate_ip(ip_str)
-        
+
         # Should return IPv6Address object
         assert isinstance(result, IPv6Address)
         assert str(result) == ip_str
@@ -60,11 +60,11 @@ class TestIPAddressValidation:
         **Validates: Requirements 10.1, 10.3**
         """
         ip_str = str(ip)
-        
+
         # Both validation methods should agree
         is_valid_format = IPAddressHandler.is_valid_ip_format(ip_str)
         assert is_valid_format is True
-        
+
         # validate_ip should not raise exception
         result = IPAddressHandler.validate_ip(ip_str)
         assert result is not None
@@ -91,7 +91,7 @@ class TestIPAddressValidation:
         # Should raise IPAddressValidationError
         with pytest.raises(IPAddressValidationError):
             IPAddressHandler.validate_ip(invalid_ip)
-        
+
         # is_valid_ip_format should return False
         assert IPAddressHandler.is_valid_ip_format(invalid_ip) is False
 
@@ -110,7 +110,7 @@ class TestIPAddressValidation:
         """
         with pytest.raises(IPAddressValidationError) as exc_info:
             IPAddressHandler.validate_ip(empty_or_whitespace)
-        
+
         # Error message should be descriptive
         error_msg = str(exc_info.value)
         assert "empty" in error_msg.lower() or "whitespace" in error_msg.lower()
@@ -124,7 +124,7 @@ class TestIPAddressValidation:
         """
         with pytest.raises(IPAddressValidationError) as exc_info:
             IPAddressHandler.validate_ip(non_string_input)
-        
+
         # Error message should indicate string requirement
         error_msg = str(exc_info.value)
         assert "string" in error_msg.lower()
@@ -137,17 +137,17 @@ class TestIPAddressValidation:
         **Validates: Requirements 10.1, 10.3**
         """
         ip_str = str(ip)
-        
+
         # Normalize the IP
         normalized = IPAddressHandler.normalize_ip(ip_str)
-        
+
         # Should be valid IP format
         assert IPAddressHandler.is_valid_ip_format(normalized)
-        
+
         # Normalizing again should produce same result
         normalized_again = IPAddressHandler.normalize_ip(normalized)
         assert normalized == normalized_again
-        
+
         # Should represent the same IP
         original_obj = IPAddressHandler.validate_ip(ip_str)
         normalized_obj = IPAddressHandler.validate_ip(normalized)
@@ -161,14 +161,14 @@ class TestIPAddressValidation:
         **Validates: Requirements 10.1, 10.3**
         """
         ip_str = str(ip)
-        
+
         # Get version from handler
         detected_version = IPAddressHandler.get_ip_version(ip_str)
-        
+
         # Should match the actual IP version
         assert detected_version == ip.version
         assert detected_version in [4, 6]
-        
+
         # Version should be consistent with object type
         ip_obj = IPAddressHandler.validate_ip(ip_str)
         assert detected_version == ip_obj.version

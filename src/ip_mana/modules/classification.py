@@ -31,7 +31,7 @@ class ClassificationModule:
         """
         classifications = []
         rules = self.config_manager.load_classifications()
-        
+
         # Check each classification rule
         for rule_name, rule in rules.items():
             try:
@@ -40,7 +40,7 @@ class ClassificationModule:
                     # Skip the broad public ranges unless no other match found
                     if rule_name in ["public_ipv4", "public_ipv6"]:
                         continue
-                    
+
                     classifications.append({
                         "name": rule.name,
                         "ip_range": rule.ip_range,
@@ -51,7 +51,7 @@ class ClassificationModule:
             except ValueError:
                 # Skip invalid IP ranges
                 continue
-        
+
         # If no specific classification found, use the appropriate public range
         if not classifications:
             public_rule_name = "public_ipv6" if ip.version == 6 else "public_ipv4"
@@ -64,7 +64,7 @@ class ClassificationModule:
                     "qualifies_for": rule.qualifies_for,
                     "rfc_reference": rule.rfc_reference
                 })
-        
+
         return classifications
 
     def get_qualified_modules(self, classifications: List[Dict]) -> List[str]:
@@ -78,16 +78,16 @@ class ClassificationModule:
             List of module names that should be executed
         """
         qualified_modules = set()
-        
+
         for classification in classifications:
             qualified_modules.update(classification.get("qualifies_for", []))
-        
+
         return list(qualified_modules)
 
     def create_default_classifications(self) -> Dict[str, ClassificationRule]:
         """
         Create default RFC-compliant IP range classifications.
-        
+
         Returns:
             Dictionary of default classification rules
         """

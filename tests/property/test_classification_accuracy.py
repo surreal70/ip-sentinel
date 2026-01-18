@@ -40,8 +40,17 @@ def valid_ip_addresses(draw):
 @composite
 def classification_rules(draw):
     """Generate valid classification rules."""
-    name = draw(st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Nd'), whitelist_characters='_-')))
-    
+    name = draw(
+        st.text(
+            min_size=1,
+            max_size=50,
+            alphabet=st.characters(
+                whitelist_categories=(
+                    'Lu',
+                    'Ll',
+                    'Nd'),
+                whitelist_characters='_-')))
+
     # Generate valid IP ranges
     ip_version = draw(st.integers(min_value=4, max_value=6))
     if ip_version == 4:
@@ -50,17 +59,29 @@ def classification_rules(draw):
     else:
         base_ip = draw(valid_ipv6_addresses())
         prefix_len = draw(st.integers(min_value=16, max_value=128))
-    
+
     ip_range = f"{base_ip}/{prefix_len}"
-    
+
     description = draw(st.text(min_size=1, max_size=200))
-    
+
     # Generate valid module names
-    valid_modules = ["local_info", "internet_info", "netbox", "checkmk", "openitcockpit", "openvas", "infoblox"]
-    qualifies_for = draw(st.lists(st.sampled_from(valid_modules), min_size=0, max_size=3, unique=True))
-    
+    valid_modules = [
+        "local_info",
+        "internet_info",
+        "netbox",
+        "checkmk",
+        "openitcockpit",
+        "openvas",
+        "infoblox"]
+    qualifies_for = draw(
+        st.lists(
+            st.sampled_from(valid_modules),
+            min_size=0,
+            max_size=3,
+            unique=True))
+
     rfc_reference = draw(st.one_of(st.none(), st.text(min_size=1, max_size=50)))
-    
+
     return ClassificationRule(
         name=name,
         ip_range=ip_range,
@@ -84,35 +105,38 @@ class TestClassificationAccuracy:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
             classifications_path = Path(temp_dir) / "classifications.json"
-            
+
             config_manager = ConfigManager(
                 config_path=config_path,
                 classifications_path=classifications_path
             )
-            
+
             # Initialize classification module
             classifier = ClassificationModule(config_manager)
-            
+
             # Perform classification
             results = classifier.classify_ip(ip_address)
-            
+
             # Verify results are valid
             assert isinstance(results, list), "Classification results must be a list"
             assert len(results) >= 1, "At least one classification should be returned"
-            
+
             for result in results:
-                assert isinstance(result, dict), "Each classification result must be a dictionary"
+                assert isinstance(
+                    result, dict), "Each classification result must be a dictionary"
                 assert "name" in result, "Classification must have a name"
                 assert "ip_range" in result, "Classification must have an ip_range"
                 assert "description" in result, "Classification must have a description"
                 assert "qualifies_for" in result, "Classification must have qualifies_for"
-                
+
                 # Verify the IP actually belongs to the classified range
                 try:
                     network = ipaddress.ip_network(result["ip_range"], strict=False)
-                    assert ip_address in network, f"IP {ip_address} should be in classified range {result['ip_range']}"
+                    assert ip_address in network, f"IP {ip_address} should be in classified range {
+                        result['ip_range']}"
                 except ValueError:
-                    assert False, f"Invalid IP range in classification: {result['ip_range']}"
+                    assert False, f"Invalid IP range in classification: {
+                        result['ip_range']}"
 
     @given(valid_ip_addresses())
     def test_classification_consistency_with_rfc_ranges(self, ip_address):
@@ -125,32 +149,39 @@ class TestClassificationAccuracy:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
             classifications_path = Path(temp_dir) / "classifications.json"
-            
+
             config_manager = ConfigManager(
                 config_path=config_path,
                 classifications_path=classifications_path
             )
-            
+
             classifier = ClassificationModule(config_manager)
             results = classifier.classify_ip(ip_address)
-            
+
             # Check specific RFC compliance for known ranges
             if ip_address.version == 4:
                 if ip_address in ipaddress.ip_network("10.0.0.0/8"):
-                    assert any(r["name"] == "private_ipv4_10" for r in results), "10.x.x.x should be classified as private_ipv4_10"
+                    assert any(
+                        r["name"] == "private_ipv4_10" for r in results), "10.x.x.x should be classified as private_ipv4_10"
                 elif ip_address in ipaddress.ip_network("172.16.0.0/12"):
-                    assert any(r["name"] == "private_ipv4_172" for r in results), "172.16-31.x.x should be classified as private_ipv4_172"
+                    assert any(
+                        r["name"] == "private_ipv4_172" for r in results), "172.16-31.x.x should be classified as private_ipv4_172"
                 elif ip_address in ipaddress.ip_network("192.168.0.0/16"):
-                    assert any(r["name"] == "private_ipv4_192" for r in results), "192.168.x.x should be classified as private_ipv4_192"
+                    assert any(
+                        r["name"] == "private_ipv4_192" for r in results), "192.168.x.x should be classified as private_ipv4_192"
                 elif ip_address in ipaddress.ip_network("127.0.0.0/8"):
-                    assert any(r["name"] == "localhost_ipv4" for r in results), "127.x.x.x should be classified as localhost_ipv4"
+                    assert any(
+                        r["name"] == "localhost_ipv4" for r in results), "127.x.x.x should be classified as localhost_ipv4"
             else:  # IPv6
                 if ip_address in ipaddress.ip_network("::1/128"):
-                    assert any(r["name"] == "localhost_ipv6" for r in results), "::1 should be classified as localhost_ipv6"
+                    assert any(
+                        r["name"] == "localhost_ipv6" for r in results), "::1 should be classified as localhost_ipv6"
                 elif ip_address in ipaddress.ip_network("fc00::/7"):
-                    assert any(r["name"] == "private_ipv6_unique_local" for r in results), "fc00::/7 should be classified as private_ipv6_unique_local"
+                    assert any(
+                        r["name"] == "private_ipv6_unique_local" for r in results), "fc00::/7 should be classified as private_ipv6_unique_local"
                 elif ip_address in ipaddress.ip_network("fe80::/10"):
-                    assert any(r["name"] == "link_local_ipv6" for r in results), "fe80::/10 should be classified as link_local_ipv6"
+                    assert any(
+                        r["name"] == "link_local_ipv6" for r in results), "fe80::/10 should be classified as link_local_ipv6"
 
     @given(classification_rules(), valid_ip_addresses())
     def test_custom_classification_accuracy(self, custom_rule, ip_address):
@@ -166,29 +197,32 @@ class TestClassificationAccuracy:
             assume(ip_address.version == rule_network.version)
         except ValueError:
             assume(False)  # Skip invalid IP ranges
-        
+
         # Create temporary config manager
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
             classifications_path = Path(temp_dir) / "classifications.json"
-            
+
             config_manager = ConfigManager(
                 config_path=config_path,
                 classifications_path=classifications_path
             )
-            
+
             # Add the custom rule
             try:
                 config_manager.add_classification(custom_rule)
             except ValueError:
                 assume(False)  # Skip invalid rules
-            
+
             classifier = ClassificationModule(config_manager)
             results = classifier.classify_ip(ip_address)
-            
+
             # Check if IP is in the custom rule's range
             if ip_address in rule_network:
-                # Should find the custom classification (unless it's a broad public range)
+                # Should find the custom classification (unless it's a broad public
+                # range)
                 if custom_rule.name not in ["public_ipv4", "public_ipv6"]:
-                    assert any(r["name"] == custom_rule.name for r in results), \
-                        f"IP {ip_address} in range {custom_rule.ip_range} should be classified as {custom_rule.name}"
+                    assert any(
+                        r["name"] == custom_rule.name for r in results), f"IP {ip_address} in range {
+                        custom_rule.ip_range} should be classified as {
+                        custom_rule.name}"

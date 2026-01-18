@@ -24,63 +24,80 @@ class HTMLFormatter(OutputFormatter):
         """
         data = self._prepare_result_data(result)
         filtered_data = self._filter_by_verbosity(data)
-        
+
         # Build HTML document
         html_parts = []
-        
+
         # HTML header with CSS styling
         html_parts.append(self._get_html_header())
-        
+
         # Main content
         html_parts.append('<div class="container">')
-        
+
         # Title and header info
         ip_addr = html.escape(str(data.get('ip_address', 'Unknown IP')))
         timestamp = data.get('scan_timestamp', datetime.now())
         if isinstance(timestamp, str):
             timestamp_str = html.escape(timestamp)
         else:
-            timestamp_str = html.escape(timestamp.strftime('%Y-%m-%d %H:%M:%S') if hasattr(timestamp, 'strftime') else str(timestamp))
-        
+            timestamp_str = html.escape(timestamp.strftime(
+                '%Y-%m-%d %H:%M:%S') if hasattr(timestamp, 'strftime') else str(timestamp))
+
         html_parts.append('<header>')
         html_parts.append('<h1>IP Intelligence Analysis Report</h1>')
-        html_parts.append(f'<div class="ip-info">')
+        html_parts.append('<div class="ip-info">')
         html_parts.append(f'<span class="ip-address">IP Address: {ip_addr}</span>')
         html_parts.append(f'<span class="scan-time">Scan Time: {timestamp_str}</span>')
         html_parts.append('</div>')
         html_parts.append('</header>')
-        
+
         html_parts.append('<main>')
-        
+
         # Classifications section
         if 'classifications' in filtered_data:
-            html_parts.append(self._format_section('Classifications', filtered_data['classifications']))
-        
+            html_parts.append(
+                self._format_section(
+                    'Classifications',
+                    filtered_data['classifications']))
+
         # Local Information section
         if 'local_info' in filtered_data:
-            html_parts.append(self._format_section('Local Network Information', filtered_data['local_info']))
-        
+            html_parts.append(
+                self._format_section(
+                    'Local Network Information',
+                    filtered_data['local_info']))
+
         # Internet Information section
         if 'internet_info' in filtered_data:
-            html_parts.append(self._format_section('Internet Information', filtered_data['internet_info']))
-        
+            html_parts.append(
+                self._format_section(
+                    'Internet Information',
+                    filtered_data['internet_info']))
+
         # Application Information section
         if 'application_info' in filtered_data:
-            html_parts.append(self._format_section('Application Information', filtered_data['application_info']))
-        
+            html_parts.append(
+                self._format_section(
+                    'Application Information',
+                    filtered_data['application_info']))
+
         # Errors section (only in appropriate verbosity modes)
         if 'errors' in filtered_data:
             errors = filtered_data['errors']
-            if (self.verbosity_mode == VerbosityMode.FULL_ERR or 
-                (self._has_meaningful_data(errors) and self.verbosity_mode != VerbosityMode.DENSE)):
-                html_parts.append(self._format_section('Errors and Issues', errors, section_class='errors'))
-        
+            if (self.verbosity_mode == VerbosityMode.FULL_ERR or (
+                    self._has_meaningful_data(errors) and self.verbosity_mode != VerbosityMode.DENSE)):
+                html_parts.append(
+                    self._format_section(
+                        'Errors and Issues',
+                        errors,
+                        section_class='errors'))
+
         html_parts.append('</main>')
         html_parts.append('</div>')
-        
+
         # HTML footer
         html_parts.append(self._get_html_footer())
-        
+
         return '\n'.join(html_parts)
 
     def _get_html_header(self) -> str:
@@ -196,19 +213,19 @@ class HTMLFormatter(OutputFormatter):
         """Format a data section as HTML."""
         escaped_title = html.escape(title)
         class_attr = f' class="section {section_class}"' if section_class else ' class="section"'
-        
+
         html_parts = [f'<div{class_attr}>']
         html_parts.append(f'<div class="section-header">{escaped_title}</div>')
         html_parts.append('<div class="section-content">')
-        
+
         if data == "no results" or not self._has_meaningful_data(data):
             html_parts.append('<div class="no-results">no results</div>')
         else:
             html_parts.append(self._format_data_as_html(data))
-        
+
         html_parts.append('</div>')
         html_parts.append('</div>')
-        
+
         return '\n'.join(html_parts)
 
     def _format_data_as_html(self, data: Any) -> str:
@@ -223,34 +240,34 @@ class HTMLFormatter(OutputFormatter):
     def _format_dict_as_html(self, data: Dict) -> str:
         """Format dictionary data as HTML."""
         html_parts = []
-        
+
         for key, value in data.items():
             formatted_key = html.escape(key.replace('_', ' ').title())
-            
+
             if isinstance(value, dict):
-                html_parts.append(f'<div class="nested-section">')
+                html_parts.append('<div class="nested-section">')
                 html_parts.append(f'<div class="nested-title">{formatted_key}</div>')
                 html_parts.append(self._format_dict_as_html(value))
                 html_parts.append('</div>')
             elif isinstance(value, list):
-                html_parts.append(f'<div class="key-value">')
+                html_parts.append('<div class="key-value">')
                 html_parts.append(f'<span class="key">{formatted_key}:</span>')
                 html_parts.append(self._format_list_as_html(value))
                 html_parts.append('</div>')
             else:
                 escaped_value = html.escape(str(value))
-                html_parts.append(f'<div class="key-value">')
+                html_parts.append('<div class="key-value">')
                 html_parts.append(f'<span class="key">{formatted_key}:</span>')
                 html_parts.append(f'<span class="value">{escaped_value}</span>')
                 html_parts.append('</div>')
-        
+
         return '\n'.join(html_parts)
 
     def _format_list_as_html(self, data: List) -> str:
         """Format list data as HTML."""
         if not data:
             return '<div class="no-results">no items</div>'
-        
+
         html_parts = ['<ul>']
         for item in data:
             if isinstance(item, dict):
@@ -261,5 +278,5 @@ class HTMLFormatter(OutputFormatter):
                 escaped_item = html.escape(str(item))
                 html_parts.append(f'<li>{escaped_item}</li>')
         html_parts.append('</ul>')
-        
+
         return '\n'.join(html_parts)

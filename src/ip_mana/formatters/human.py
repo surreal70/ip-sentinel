@@ -2,9 +2,8 @@
 Human-readable console output formatter.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 from datetime import datetime
-from ipaddress import IPv4Address, IPv6Address
 
 from .base import OutputFormatter, VerbosityMode
 
@@ -24,19 +23,20 @@ class HumanFormatter(OutputFormatter):
         """
         data = self._prepare_result_data(result)
         filtered_data = self._filter_by_verbosity(data)
-        
+
         output_lines = []
-        
+
         # Header
         ip_addr = data.get('ip_address', 'Unknown IP')
         timestamp = data.get('scan_timestamp', datetime.now())
         if isinstance(timestamp, str):
             timestamp_str = timestamp
         else:
-            timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S') if hasattr(timestamp, 'strftime') else str(timestamp)
-        
+            timestamp_str = timestamp.strftime(
+                '%Y-%m-%d %H:%M:%S') if hasattr(timestamp, 'strftime') else str(timestamp)
+
         output_lines.append("=" * 60)
-        output_lines.append(f"IP Intelligence Analysis Report")
+        output_lines.append("IP Intelligence Analysis Report")
         output_lines.append("=" * 60)
         output_lines.append(f"IP Address: {ip_addr}")
         output_lines.append(f"Scan Time:  {timestamp_str}")
@@ -61,7 +61,8 @@ class HumanFormatter(OutputFormatter):
         # Local Information
         if 'local_info' in filtered_data:
             local_info = filtered_data['local_info']
-            if self._has_meaningful_data(local_info) or self.verbosity_mode != VerbosityMode.DENSE:
+            if self._has_meaningful_data(
+                    local_info) or self.verbosity_mode != VerbosityMode.DENSE:
                 output_lines.append("Local Network Information:")
                 output_lines.append("-" * 25)
                 if local_info == "no results":
@@ -77,7 +78,8 @@ class HumanFormatter(OutputFormatter):
         # Internet Information
         if 'internet_info' in filtered_data:
             internet_info = filtered_data['internet_info']
-            if self._has_meaningful_data(internet_info) or self.verbosity_mode != VerbosityMode.DENSE:
+            if self._has_meaningful_data(
+                    internet_info) or self.verbosity_mode != VerbosityMode.DENSE:
                 output_lines.append("Internet Information:")
                 output_lines.append("-" * 20)
                 if internet_info == "no results":
@@ -98,7 +100,8 @@ class HumanFormatter(OutputFormatter):
         # Application Information
         if 'application_info' in filtered_data:
             app_info = filtered_data['application_info']
-            if self._has_meaningful_data(app_info) or self.verbosity_mode != VerbosityMode.DENSE:
+            if self._has_meaningful_data(
+                    app_info) or self.verbosity_mode != VerbosityMode.DENSE:
                 output_lines.append("Application Information:")
                 output_lines.append("-" * 23)
                 if app_info == "no results" or not app_info:
@@ -119,8 +122,8 @@ class HumanFormatter(OutputFormatter):
         # Errors (only in full-err mode or if there are errors in other modes)
         if 'errors' in filtered_data:
             errors = filtered_data['errors']
-            if (self.verbosity_mode == VerbosityMode.FULL_ERR or 
-                (self._has_meaningful_data(errors) and self.verbosity_mode != VerbosityMode.DENSE)):
+            if (self.verbosity_mode == VerbosityMode.FULL_ERR or (
+                    self._has_meaningful_data(errors) and self.verbosity_mode != VerbosityMode.DENSE)):
                 output_lines.append("Errors and Issues:")
                 output_lines.append("-" * 17)
                 if not self._has_meaningful_data(errors):
@@ -134,5 +137,5 @@ class HumanFormatter(OutputFormatter):
 
         # Footer
         output_lines.append("=" * 60)
-        
+
         return "\n".join(output_lines)

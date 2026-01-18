@@ -3,7 +3,6 @@ Command-line interface for IP Intelligence Analyzer.
 """
 
 import argparse
-import logging
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -20,7 +19,10 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument("ip_address", nargs='?', help="IP address to analyze (IPv4 or IPv6)")
+    parser.add_argument(
+        "ip_address",
+        nargs='?',
+        help="IP address to analyze (IPv4 or IPv6)")
 
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
@@ -85,8 +87,8 @@ def create_parser() -> argparse.ArgumentParser:
     # Configuration options
     parser.add_argument("--config", type=str, help="Configuration file path")
     parser.add_argument(
-        "--credentials", 
-        type=str, 
+        "--credentials",
+        type=str,
         help="Application Module credential file path (default: config/app_credentials.json)"
     )
 
@@ -132,50 +134,53 @@ def handle_classification_management(args, config_manager: ConfigManager) -> int
         if args.add_classification:
             name, ip_range, description, qualifies_for_str = args.add_classification
             qualifies_for = [m.strip() for m in qualifies_for_str.split(',')]
-            
+
             rule = ClassificationRule(
                 name=name,
                 ip_range=ip_range,
                 description=description,
                 qualifies_for=qualifies_for
             )
-            
+
             config_manager.add_classification(rule)
             print(f"Successfully added classification rule: {name}")
             return 0
-            
+
         elif args.delete_classification:
             if config_manager.remove_classification(args.delete_classification):
-                print(f"Successfully deleted classification rule: {args.delete_classification}")
+                print(
+                    f"Successfully deleted classification rule: {
+                        args.delete_classification}")
             else:
                 print(f"Classification rule not found: {args.delete_classification}")
                 return 1
             return 0
-            
+
         elif args.update_classification:
             old_name, new_name, ip_range, description, qualifies_for_str = args.update_classification
             qualifies_for = [m.strip() for m in qualifies_for_str.split(',')]
-            
+
             updated_rule = ClassificationRule(
                 name=new_name,
                 ip_range=ip_range,
                 description=description,
                 qualifies_for=qualifies_for
             )
-            
+
             if config_manager.update_classification(old_name, updated_rule):
-                print(f"Successfully updated classification rule: {old_name} -> {new_name}")
+                print(
+                    f"Successfully updated classification rule: {old_name} -> {new_name}")
             else:
                 print(f"Classification rule not found: {old_name}")
                 return 1
             return 0
-            
+
         elif args.list_classifications:
             rules = config_manager.load_classifications()
             if not rules:
                 print("No classification rules found.")
                 return 0
-                
+
             print("Classification Rules:")
             print("-" * 80)
             for name, rule in rules.items():
@@ -187,11 +192,11 @@ def handle_classification_management(args, config_manager: ConfigManager) -> int
                     print(f"RFC Reference: {rule.rfc_reference}")
                 print("-" * 80)
             return 0
-            
+
     except ValueError as e:
         print(f"Error: {e}")
         return 1
-    
+
     return 0
 
 
@@ -209,7 +214,7 @@ def main(args: Optional[List[str]] = None) -> int:
     config_manager = ConfigManager(config_path=config_path)
 
     # Handle classification management operations
-    if any([parsed_args.add_classification, parsed_args.delete_classification, 
+    if any([parsed_args.add_classification, parsed_args.delete_classification,
             parsed_args.list_classifications, parsed_args.update_classification]):
         return handle_classification_management(parsed_args, config_manager)
 
@@ -219,56 +224,58 @@ def main(args: Optional[List[str]] = None) -> int:
 
     # Build configuration from command-line arguments
     config = build_config_from_args(parsed_args)
-    
+
     # Initialize analyzer with context manager for proper cleanup
     try:
         from .analyzer import IPAnalyzer
-        from .formatters.human import HumanFormatter
-        from .formatters.json import JSONFormatter
-        from .formatters.html import HTMLFormatter
-        
+
         with IPAnalyzer(
             config=config,
             config_manager=config_manager,
             credential_file=parsed_args.credentials
         ) as analyzer:
-            
+
             # Validate requested modules
             requested_modules = get_requested_modules(parsed_args)
             if requested_modules:
                 availability = analyzer.validate_module_availability(requested_modules)
                 unavailable = [m for m, avail in availability.items() if not avail]
-                
+
                 if unavailable:
-                    print(f"Warning: The following modules are not available: {', '.join(unavailable)}")
+                    print(
+                        f"Warning: The following modules are not available: {
+                            ', '.join(unavailable)}")
                     if parsed_args.verbose:
-                        print("Available modules:", ', '.join(analyzer.get_available_modules()))
-            
+                        print(
+                            "Available modules:", ', '.join(
+                                analyzer.get_available_modules()))
+
             # Perform analysis
             if parsed_args.verbose:
                 print(f"IP-ManA v{__version__}")
                 print(f"Analyzing IP: {parsed_args.ip_address}")
                 print(f"Output format: {config.output_format}")
                 print(f"Reporting mode: {config.reporting_mode}")
-                print(f"Enabled modules: {[m for m, enabled in config.enabled_modules.items() if enabled]}")
+                print(
+                    f"Enabled modules: {[m for m, enabled in config.enabled_modules.items() if enabled]}")
                 print("-" * 80)
-            
+
             result = analyzer.analyze(parsed_args.ip_address)
-            
+
             # Format and output results
             formatter = get_formatter(config.output_format, config.reporting_mode)
             output = formatter.format_result(result)
             print(output)
-            
+
             # Report errors if any
             if result.errors:
                 print("\nErrors encountered during analysis:", file=sys.stderr)
                 for error in result.errors:
                     print(f"  - {error}", file=sys.stderr)
                 return 1
-            
+
             return 0
-        
+
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         if parsed_args.verbose:
@@ -280,29 +287,29 @@ def main(args: Optional[List[str]] = None) -> int:
 def build_config_from_args(args) -> Config:
     """
     Build Config object from command-line arguments.
-    
+
     Args:
         args: Parsed command-line arguments
-        
+
     Returns:
         Config object
     """
     from .config import Config
-    
+
     # Determine output format
     output_format = "human"
     if args.json:
         output_format = "json"
     elif args.html:
         output_format = "html"
-    
+
     # Determine reporting mode
     reporting_mode = "dense"
     if args.full:
         reporting_mode = "full"
     elif args.full_err:
         reporting_mode = "full-err"
-    
+
     # Determine enabled modules
     enabled_modules = {
         "classification": True,
@@ -314,13 +321,13 @@ def build_config_from_args(args) -> Config:
         "openvas": args.openvas,
         "infoblox": args.infoblox,
     }
-    
+
     # Determine force internet flag
     force_internet = args.force_internet or args.force_module3
-    
+
     # Determine database path
     database_path = Path(args.db_path) if args.db_path else None
-    
+
     return Config(
         database_path=database_path,
         output_format=output_format,
@@ -334,15 +341,15 @@ def build_config_from_args(args) -> Config:
 def get_requested_modules(args) -> List[str]:
     """
     Get list of explicitly requested modules from arguments.
-    
+
     Args:
         args: Parsed command-line arguments
-        
+
     Returns:
         List of requested module names
     """
     requested = []
-    
+
     if args.netbox:
         requested.append('netbox')
     if args.checkmk:
@@ -353,25 +360,25 @@ def get_requested_modules(args) -> List[str]:
         requested.append('openvas')
     if args.infoblox:
         requested.append('infoblox')
-    
+
     return requested
 
 
 def get_formatter(output_format: str, reporting_mode: str):
     """
     Get appropriate formatter based on output format and reporting mode.
-    
+
     Args:
         output_format: Output format ('human', 'json', 'html')
         reporting_mode: Reporting mode ('dense', 'full', 'full-err')
-        
+
     Returns:
         Formatter instance
     """
     from .formatters.human import HumanFormatter
     from .formatters.json import JSONFormatter
     from .formatters.html import HTMLFormatter
-    
+
     if output_format == "json":
         return JSONFormatter(reporting_mode)
     elif output_format == "html":

@@ -6,7 +6,7 @@ Validates: Requirements 10.7
 """
 
 import pytest
-from hypothesis import given, strategies as st, settings, assume
+from hypothesis import given, strategies as st, settings
 from pathlib import Path
 import tempfile
 import json
@@ -47,23 +47,23 @@ def config_data_strategy(draw):
 def test_configuration_file_processing_property(config_data):
     """
     Property 22: Configuration File Processing
-    
+
     For any configuration file provided to the application, the settings should be
     properly loaded and applied as defaults, with command-line options taking
     precedence over file settings.
-    
+
     Validates: Requirements 10.7
     """
     # Create a temporary configuration file
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(config_data, f)
         config_file = f.name
-    
+
     try:
         # Load configuration from file
         config_manager = ConfigManager(config_path=Path(config_file))
         loaded_config = config_manager.load_config()
-        
+
         # Property 1: All settings from file should be loaded
         assert loaded_config.output_format == config_data["output_format"], \
             "Output format should be loaded from config file"
@@ -73,7 +73,7 @@ def test_configuration_file_processing_property(config_data):
             "Force internet flag should be loaded from config file"
         assert loaded_config.verbose == config_data["verbose"], \
             "Verbose flag should be loaded from config file"
-        
+
         # Property 2: Database path should be converted to Path object
         if config_data["database_path"]:
             assert loaded_config.database_path == Path(config_data["database_path"]), \
@@ -81,33 +81,33 @@ def test_configuration_file_processing_property(config_data):
         else:
             assert loaded_config.database_path is None, \
                 "None database path should remain None"
-        
+
         # Property 3: Enabled modules should be loaded correctly
         for module, enabled in config_data["enabled_modules"].items():
             assert loaded_config.enabled_modules[module] == enabled, \
                 f"Module {module} enabled status should match config file"
-        
+
         # Property 4: Configuration should be saveable and reloadable
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f2:
             save_file = f2.name
-        
+
         try:
             config_manager2 = ConfigManager(config_path=Path(save_file))
             config_manager2.save_config(loaded_config)
-            
+
             # Reload and verify
             reloaded_config = config_manager2.load_config()
-            
+
             assert reloaded_config.output_format == loaded_config.output_format, \
                 "Reloaded config should match original"
             assert reloaded_config.reporting_mode == loaded_config.reporting_mode, \
                 "Reloaded config should match original"
             assert reloaded_config.force_internet == loaded_config.force_internet, \
                 "Reloaded config should match original"
-            
+
         finally:
             Path(save_file).unlink(missing_ok=True)
-        
+
     finally:
         # Clean up
         Path(config_file).unlink(missing_ok=True)
@@ -120,13 +120,17 @@ def test_configuration_file_processing_property(config_data):
     force_internet=st.booleans(),
     verbose=st.booleans()
 )
-def test_cli_args_override_config_file(output_format, reporting_mode, force_internet, verbose):
+def test_cli_args_override_config_file(
+        output_format,
+        reporting_mode,
+        force_internet,
+        verbose):
     """
     Property: Command-line arguments should take precedence over config file settings.
-    
+
     For any configuration file and command-line arguments, the command-line arguments
     should override the file settings.
-    
+
     Validates: Requirements 10.7
     """
     # Create a config file with different settings
@@ -136,11 +140,11 @@ def test_cli_args_override_config_file(output_format, reporting_mode, force_inte
         "force_internet": False,
         "verbose": False
     }
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(file_config, f)
         config_file = f.name
-    
+
     try:
         # Create mock command-line arguments
         args = argparse.Namespace(
@@ -158,10 +162,10 @@ def test_cli_args_override_config_file(output_format, reporting_mode, force_inte
             openvas=False,
             infoblox=False
         )
-        
+
         # Build config from args (which should override file settings)
         config = build_config_from_args(args)
-        
+
         # Property: CLI args should override file settings
         assert config.output_format == output_format, \
             "CLI output format should override file setting"
@@ -171,7 +175,7 @@ def test_cli_args_override_config_file(output_format, reporting_mode, force_inte
             "CLI force_internet should override file setting"
         assert config.verbose == verbose, \
             "CLI verbose should override file setting"
-        
+
     finally:
         Path(config_file).unlink(missing_ok=True)
 
@@ -180,10 +184,10 @@ def test_config_file_not_found_uses_defaults():
     """Test that missing config file results in default configuration."""
     # Use a non-existent config file path
     non_existent_path = Path("/tmp/nonexistent_config_12345.json")
-    
+
     config_manager = ConfigManager(config_path=non_existent_path)
     config = config_manager.load_config()
-    
+
     # Should return default config
     assert isinstance(config, Config)
     assert config.output_format == "human"
@@ -197,13 +201,13 @@ def test_config_file_invalid_json_raises_error():
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         f.write("{ invalid json }")
         config_file = f.name
-    
+
     try:
         config_manager = ConfigManager(config_path=Path(config_file))
-        
+
         with pytest.raises(ValueError, match="Invalid configuration file format"):
             config_manager.load_config()
-            
+
     finally:
         Path(config_file).unlink(missing_ok=True)
 
@@ -215,23 +219,23 @@ def test_config_file_partial_settings():
         "output_format": "json",
         "verbose": True
     }
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(partial_config, f)
         config_file = f.name
-    
+
     try:
         config_manager = ConfigManager(config_path=Path(config_file))
         config = config_manager.load_config()
-        
+
         # Specified settings should be loaded
         assert config.output_format == "json"
         assert config.verbose is True
-        
+
         # Unspecified settings should use defaults
         assert config.reporting_mode == "dense"
         assert config.force_internet is False
-        
+
     finally:
         Path(config_file).unlink(missing_ok=True)
 
@@ -256,18 +260,18 @@ def test_config_roundtrip_preserves_all_settings():
         },
         verbose=True
     )
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         config_file = f.name
-    
+
     try:
         # Save config
         config_manager = ConfigManager(config_path=Path(config_file))
         config_manager.save_config(original_config)
-        
+
         # Load config
         loaded_config = config_manager.load_config()
-        
+
         # Verify all settings are preserved
         assert loaded_config.database_path == original_config.database_path
         assert loaded_config.output_format == original_config.output_format
@@ -275,6 +279,6 @@ def test_config_roundtrip_preserves_all_settings():
         assert loaded_config.force_internet == original_config.force_internet
         assert loaded_config.verbose == original_config.verbose
         assert loaded_config.enabled_modules == original_config.enabled_modules
-        
+
     finally:
         Path(config_file).unlink(missing_ok=True)
