@@ -252,12 +252,12 @@ class DatabaseManager:
         
         return health_status
 
-    def store_scan_result(self, result: Dict) -> int:
+    def store_scan_result(self, result) -> int:
         """
         Store analysis result in database.
 
         Args:
-            result: Analysis result dictionary to store
+            result: AnalysisResult object or dictionary to store
 
         Returns:
             ID of the stored scan record
@@ -268,13 +268,26 @@ class DatabaseManager:
         try:
             self.create_database()  # Ensure database exists
             
+            # Convert AnalysisResult to dict if needed
+            if hasattr(result, 'to_dict'):
+                result_dict = result.to_dict()
+            elif isinstance(result, dict):
+                result_dict = result
+            else:
+                raise DatabaseError("Result must be AnalysisResult object or dictionary")
+            
             # Validate input data
-            if not result.get('ip_address'):
+            if not result_dict.get('ip_address'):
                 raise DatabaseError("IP address is required")
             
-            ip_version = result.get('ip_version', 4)
-            if ip_version not in (4, 6):
-                raise DatabaseError(f"Invalid IP version: {ip_version}")
+            # Determine IP version from the IP address string
+            ip_str = str(result_dict.get('ip_address', ''))
+            try:
+                from ipaddress import ip_address
+                ip_obj = ip_address(ip_str)
+                ip_version = 6 if ip_obj.version == 6 else 4
+            except:
+                ip_version = 4  # Default to IPv4
             
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -283,10 +296,25 @@ class DatabaseManager:
                 cursor.execute("PRAGMA foreign_keys = ON")
                 
                 # Extract basic scan information
-                ip_address = str(result.get('ip_address', ''))
-                scan_timestamp = result.get('scan_timestamp', datetime.now())
-                scan_duration_ms = result.get('scan_duration_ms', 0)
-                modules_executed = json.dumps(result.get('modules_executed', []))
+                ip_address_str = ip_str
+                scan_timestamp = result_dict.get('scan_timestamp', datetime.now())
+                if isinstance(scan_timestamp, str):
+                    scan_timestamp = datetime.fromisoformat(scan_timestamp)
+                
+                scan_duration_ms = result_dict.get('scan_duration_ms', 0)
+                
+                # Determine which modules were executed
+                modules_executed = []
+                if result_dict.get('classifications'):
+                    modules_executed.append('classification')
+                if result_dict.get('local_info'):
+                    modules_executed.append('local_info')
+                if result_dict.get('internet_info'):
+                    modules_executed.append('internet_info')
+                if result_dict.get('application_info'):
+                    modules_executed.extend(result_dict['application_info'].keys())
+                
+                modules_executed_json = json.dumps(modules_executed)
                 
                 # Validate scan duration
                 if scan_duration_ms < 0:
@@ -302,15 +330,47 @@ class DatabaseManager:
                 cursor.execute("""
                     INSERT INTO scans (ip_address, ip_version, scan_timestamp, scan_duration_ms, modules_executed)
                     VALUES (?, ?, ?, ?, ?)
-                """, (ip_address, ip_version, timestamp_str, scan_duration_ms, modules_executed))
+                """, (ip_address_str, ip_version, timestamp_str, scan_duration_ms, modules_executed_json))
                 
                 scan_id = cursor.lastrowid
                 
                 if not scan_id:
                     raise DatabaseError("Failed to get scan ID after insertion")
                 
-                # Store module results
-                for module_name, module_result in result.get('module_results', {}).items():
+                # Store module results - build from result structure
+                module_results = {}
+                
+                # Add classification results
+                if result_dict.get('classifications'):
+                    module_results['classification'] = {
+                        'success': True,
+                        'data': {'classifications': result_dict['classifications']},
+                        'error_message': None
+                    }
+                
+                # Add local_info results
+                if result_dict.get('local_info'):
+                    module_results['local_info'] = {
+                        'success': True,
+                        'data': result_dict['local_info'],
+                        'error_message': None
+                    }
+                
+                # Add internet_info results
+                if result_dict.get('internet_info'):
+                    module_results['internet_info'] = {
+                        'success': True,
+                        'data': result_dict['internet_info'],
+                        'error_message': None
+                    }
+                
+                # Add application_info results
+                if result_dict.get('application_info'):
+                    for submodule_name, submodule_data in result_dict['application_info'].items():
+                        module_results[submodule_name] = submodule_data
+                
+                # Store each module result
+                for module_name, module_result in module_results.items():
                     if not isinstance(module_result, dict):
                         self.logger.warning(f"Invalid module result format for {module_name}")
                         continue

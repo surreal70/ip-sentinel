@@ -3,12 +3,13 @@ Command-line interface for IP Intelligence Analyzer.
 """
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import List, Optional
 
 from . import __version__
-from .config import ConfigManager, ClassificationRule
+from .config import ConfigManager, ClassificationRule, Config
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -199,6 +200,10 @@ def main(args: Optional[List[str]] = None) -> int:
     parser = create_parser()
     parsed_args = parser.parse_args(args)
 
+    # Setup logging using analyzer's setup_logging function
+    from .analyzer import setup_logging
+    setup_logging(verbose=parsed_args.verbose)
+
     # Initialize configuration manager
     config_path = Path(parsed_args.config) if parsed_args.config else None
     config_manager = ConfigManager(config_path=config_path)
@@ -212,11 +217,167 @@ def main(args: Optional[List[str]] = None) -> int:
     if not parsed_args.ip_address:
         parser.error("IP address is required for analysis operations")
 
-    # TODO: Implement main application logic
-    print(f"IP-ManA v{__version__}")
-    print(f"Analyzing IP: {parsed_args.ip_address}")
+    # Build configuration from command-line arguments
+    config = build_config_from_args(parsed_args)
+    
+    # Initialize analyzer with context manager for proper cleanup
+    try:
+        from .analyzer import IPAnalyzer
+        from .formatters.human import HumanFormatter
+        from .formatters.json import JSONFormatter
+        from .formatters.html import HTMLFormatter
+        
+        with IPAnalyzer(
+            config=config,
+            config_manager=config_manager,
+            credential_file=parsed_args.credentials
+        ) as analyzer:
+            
+            # Validate requested modules
+            requested_modules = get_requested_modules(parsed_args)
+            if requested_modules:
+                availability = analyzer.validate_module_availability(requested_modules)
+                unavailable = [m for m, avail in availability.items() if not avail]
+                
+                if unavailable:
+                    print(f"Warning: The following modules are not available: {', '.join(unavailable)}")
+                    if parsed_args.verbose:
+                        print("Available modules:", ', '.join(analyzer.get_available_modules()))
+            
+            # Perform analysis
+            if parsed_args.verbose:
+                print(f"IP-ManA v{__version__}")
+                print(f"Analyzing IP: {parsed_args.ip_address}")
+                print(f"Output format: {config.output_format}")
+                print(f"Reporting mode: {config.reporting_mode}")
+                print(f"Enabled modules: {[m for m, enabled in config.enabled_modules.items() if enabled]}")
+                print("-" * 80)
+            
+            result = analyzer.analyze(parsed_args.ip_address)
+            
+            # Format and output results
+            formatter = get_formatter(config.output_format, config.reporting_mode)
+            output = formatter.format_result(result)
+            print(output)
+            
+            # Report errors if any
+            if result.errors:
+                print("\nErrors encountered during analysis:", file=sys.stderr)
+                for error in result.errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 1
+            
+            return 0
+        
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if parsed_args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
 
-    return 0
+
+def build_config_from_args(args) -> Config:
+    """
+    Build Config object from command-line arguments.
+    
+    Args:
+        args: Parsed command-line arguments
+        
+    Returns:
+        Config object
+    """
+    from .config import Config
+    
+    # Determine output format
+    output_format = "human"
+    if args.json:
+        output_format = "json"
+    elif args.html:
+        output_format = "html"
+    
+    # Determine reporting mode
+    reporting_mode = "dense"
+    if args.full:
+        reporting_mode = "full"
+    elif args.full_err:
+        reporting_mode = "full-err"
+    
+    # Determine enabled modules
+    enabled_modules = {
+        "classification": True,
+        "local_info": True,
+        "internet_info": True,
+        "netbox": args.netbox,
+        "checkmk": args.checkmk,
+        "openitcockpit": args.openitcockpit,
+        "openvas": args.openvas,
+        "infoblox": args.infoblox,
+    }
+    
+    # Determine force internet flag
+    force_internet = args.force_internet or args.force_module3
+    
+    # Determine database path
+    database_path = Path(args.db_path) if args.db_path else None
+    
+    return Config(
+        database_path=database_path,
+        output_format=output_format,
+        reporting_mode=reporting_mode,
+        force_internet=force_internet,
+        enabled_modules=enabled_modules,
+        verbose=args.verbose
+    )
+
+
+def get_requested_modules(args) -> List[str]:
+    """
+    Get list of explicitly requested modules from arguments.
+    
+    Args:
+        args: Parsed command-line arguments
+        
+    Returns:
+        List of requested module names
+    """
+    requested = []
+    
+    if args.netbox:
+        requested.append('netbox')
+    if args.checkmk:
+        requested.append('checkmk')
+    if args.openitcockpit:
+        requested.append('openitcockpit')
+    if args.openvas:
+        requested.append('openvas')
+    if args.infoblox:
+        requested.append('infoblox')
+    
+    return requested
+
+
+def get_formatter(output_format: str, reporting_mode: str):
+    """
+    Get appropriate formatter based on output format and reporting mode.
+    
+    Args:
+        output_format: Output format ('human', 'json', 'html')
+        reporting_mode: Reporting mode ('dense', 'full', 'full-err')
+        
+    Returns:
+        Formatter instance
+    """
+    from .formatters.human import HumanFormatter
+    from .formatters.json import JSONFormatter
+    from .formatters.html import HTMLFormatter
+    
+    if output_format == "json":
+        return JSONFormatter(reporting_mode)
+    elif output_format == "html":
+        return HTMLFormatter(reporting_mode)
+    else:
+        return HumanFormatter(reporting_mode)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,120 @@
+IP Intelligence Analyzer (IP-ManA)
+Copyright (c) 2026 IP-ManA Development Team
+
+This software is licensed under the MIT License. See LICENSE file for details.
+
+================================================================================
+
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This software incorporates components from the projects listed below. The original
+copyright notices and licenses under which we received such components are set
+forth below for informational purposes. We reserve all rights not expressly
+granted herein, whether by implication, estoppel, or otherwise.
+
+================================================================================
+
+1. netaddr (BSD-3-Clause License)
+   Copyright (c) 2008-2023, David P. D. Moss
+   https://github.com/netaddr/netaddr
+
+2. ipwhois (BSD-2-Clause License)
+   Copyright (c) 2013-2023, Philip Hane
+   https://github.com/secynic/ipwhois
+
+3. python-nmap (GPL-3.0 License)
+   Copyright (c) 2011-2023, Alexandre Norman
+   https://github.com/nmmapper/python3-nmap
+   
+   IMPORTANT: python-nmap is licensed under GPL-3.0. This is a wrapper library
+   that calls the external 'nmap' tool. Users of this software must ensure they
+   comply with the GPL-3.0 license when using nmap. The nmap tool itself is
+   also GPL-2.0 licensed and must be installed separately.
+
+4. netifaces (MIT License)
+   Copyright (c) 2007-2023, Alastair Houghton
+   https://github.com/al45tair/netifaces
+
+5. sslyze (AGPL-3.0 License)
+   Copyright (c) 2012-2023, Alban Diquet
+   https://github.com/nabla-c0d3/sslyze
+   
+   IMPORTANT: sslyze is licensed under AGPL-3.0 (GNU Affero General Public
+   License v3.0). Users of this software must ensure they comply with the
+   AGPL-3.0 license when using sslyze. If you modify sslyze and offer it as
+   a network service, you must make the source code available.
+
+6. requests (Apache License 2.0)
+   Copyright (c) 2019-2023, Kenneth Reitz
+   https://github.com/psf/requests
+
+7. click (BSD-3-Clause License)
+   Copyright (c) 2014-2023, Pallets
+   https://github.com/pallets/click
+
+8. colorama (BSD-3-Clause License)
+   Copyright (c) 2010-2023, Jonathan Hartley
+   https://github.com/tartley/colorama
+
+================================================================================
+
+DEVELOPMENT DEPENDENCIES (Not included in runtime distribution)
+
+9. pytest (MIT License)
+   Copyright (c) 2004-2023, Holger Krekel and others
+   https://github.com/pytest-dev/pytest
+
+10. hypothesis (Mozilla Public License 2.0)
+    Copyright (c) 2013-2023, David R. MacIver and Zac Hatfield-Dodds
+    https://github.com/HypothesisWorks/hypothesis
+
+11. black (MIT License)
+    Copyright (c) 2018-2023, Łukasz Langa and contributors
+    https://github.com/psf/black
+
+12. flake8 (MIT License)
+    Copyright (c) 2011-2023, Tarek Ziade and contributors
+    https://github.com/PyCQA/flake8
+
+13. isort (MIT License)
+    Copyright (c) 2013-2023, Timothy Edmund Crosley
+    https://github.com/PyCQA/isort
+
+================================================================================
+
+EXTERNAL TOOLS REQUIRED
+
+This software requires the following external tools to be installed:
+
+- nmap: Network exploration tool (GPL-2.0 License)
+  https://nmap.org/
+  Users must install nmap separately and comply with its GPL-2.0 license.
+
+================================================================================
+
+LICENSE COMPATIBILITY NOTICE
+
+This software is licensed under the MIT License, which is compatible with all
+the dependencies listed above. However, please note:
+
+1. GPL-3.0 (python-nmap) and AGPL-3.0 (sslyze) are copyleft licenses. These
+   libraries are used as external dependencies and do not affect the licensing
+   of this software itself. However, users and distributors must ensure
+   compliance with these licenses when using or distributing this software.
+
+2. The MIT License allows you to use, modify, and distribute this software
+   freely, but you must include the copyright notice and license text in all
+   copies or substantial portions of the software.
+
+3. If you distribute this software, you should include this NOTICE file along
+   with the LICENSE file to properly attribute all dependencies.
+
+For detailed license compatibility analysis, see docs/LICENSE_ANALYSIS.md
+
+================================================================================
+
+For questions about licensing, please contact the project maintainers or
+consult with a qualified attorney specializing in open source software licensing.
+
+This NOTICE file is provided for informational purposes and does not constitute
+legal advice.
