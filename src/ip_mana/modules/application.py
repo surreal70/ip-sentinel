@@ -37,6 +37,7 @@ class AuthenticationConfig:
     credentials: Dict[str, str]
     base_url: str
     timeout: int = 30
+    verify_ssl: bool = True
 
 
 class CredentialManager:
@@ -121,7 +122,8 @@ class CredentialManager:
             auth_type=mapped_method,
             credentials=credentials,
             base_url=submodule_config.get('base_url', ''),
-            timeout=submodule_config.get('timeout', 30)
+            timeout=submodule_config.get('timeout', 30),
+            verify_ssl=submodule_config.get('verify_ssl', True)
         )
     
     def validate_credentials(self) -> Dict[str, bool]:
@@ -279,6 +281,10 @@ class ApplicationSubmodule(ABC):
 
         url = f"{self.config.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         
+        # Set verify parameter based on configuration
+        if 'verify' not in kwargs:
+            kwargs['verify'] = self.config.verify_ssl
+        
         try:
             response = self.session.request(
                 method=method,
@@ -306,19 +312,103 @@ class NetBoxSubmodule(ApplicationSubmodule):
     """NetBox IPAM system integration submodule."""
 
     def query_ip(self, ip: IPAddress) -> ApplicationResult:
-        """Query NetBox for IP address information."""
+        """
+        Query NetBox for comprehensive IP address information.
+        
+        Retrieves:
+        - IP address details with network information
+        - Prefix and subnet information
+        - Device and interface associations
+        - VLAN and VRF information
+        
+        Args:
+            ip: IPAddress object to query
+            
+        Returns:
+            ApplicationResult with comprehensive IPAM data
+        """
         try:
-            # Query IP address details
-            ip_data = self._make_request(f"api/ipam/ip-addresses/?address={ip}")
-            
-            # Query prefix information
-            prefix_data = self._make_request(f"api/ipam/prefixes/?contains={ip}")
-            
             result_data = {
-                'ip_addresses': ip_data.get('results', []),
-                'prefixes': prefix_data.get('results', []),
+                'ip_addresses': [],
+                'prefixes': [],
+                'devices': [],
+                'interfaces': [],
+                'vlans': [],
+                'vrfs': [],
                 'source': 'NetBox IPAM'
             }
+            
+            # Query IP address details
+            logger.info(f"Querying NetBox for IP address: {ip}")
+            ip_data = self._make_request(f"api/ipam/ip-addresses/?address={ip}")
+            ip_results = ip_data.get('results', [])
+            result_data['ip_addresses'] = ip_results
+            
+            # Query prefix information (subnets containing this IP)
+            logger.info(f"Querying NetBox for prefixes containing: {ip}")
+            prefix_data = self._make_request(f"api/ipam/prefixes/?contains={ip}")
+            result_data['prefixes'] = prefix_data.get('results', [])
+            
+            # If we found IP address records, get associated device and interface information
+            if ip_results:
+                for ip_record in ip_results:
+                    # Get interface association
+                    assigned_object = ip_record.get('assigned_object')
+                    if assigned_object:
+                        assigned_object_id = assigned_object.get('id')
+                        assigned_object_type = assigned_object.get('object_type', '')
+                        
+                        # Query interface details if assigned to an interface
+                        if 'interface' in assigned_object_type.lower() and assigned_object_id:
+                            try:
+                                logger.info(f"Querying NetBox for interface: {assigned_object_id}")
+                                interface_data = self._make_request(f"api/dcim/interfaces/{assigned_object_id}/")
+                                result_data['interfaces'].append(interface_data)
+                                
+                                # Get device information from interface
+                                device_info = interface_data.get('device')
+                                if device_info and device_info.get('id'):
+                                    device_id = device_info['id']
+                                    logger.info(f"Querying NetBox for device: {device_id}")
+                                    device_data = self._make_request(f"api/dcim/devices/{device_id}/")
+                                    result_data['devices'].append(device_data)
+                            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                                logger.warning(f"Failed to query interface/device details: {e}")
+                    
+                    # Get VRF information if present
+                    vrf = ip_record.get('vrf')
+                    if vrf and vrf.get('id'):
+                        vrf_id = vrf['id']
+                        try:
+                            logger.info(f"Querying NetBox for VRF: {vrf_id}")
+                            vrf_data = self._make_request(f"api/ipam/vrfs/{vrf_id}/")
+                            result_data['vrfs'].append(vrf_data)
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query VRF details: {e}")
+            
+            # Get VLAN information from prefixes
+            for prefix in result_data['prefixes']:
+                vlan = prefix.get('vlan')
+                if vlan and vlan.get('id'):
+                    vlan_id = vlan['id']
+                    try:
+                        logger.info(f"Querying NetBox for VLAN: {vlan_id}")
+                        vlan_data = self._make_request(f"api/ipam/vlans/{vlan_id}/")
+                        # Avoid duplicates
+                        if not any(v.get('id') == vlan_id for v in result_data['vlans']):
+                            result_data['vlans'].append(vlan_data)
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query VLAN details: {e}")
+            
+            # Determine success based on whether we found any data
+            has_data = any([
+                result_data['ip_addresses'],
+                result_data['prefixes'],
+                result_data['devices'],
+                result_data['interfaces'],
+                result_data['vlans'],
+                result_data['vrfs']
+            ])
             
             return ApplicationResult(
                 success=True,
@@ -326,11 +416,36 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 source='netbox'
             )
             
-        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+        except AuthenticationError as e:
+            logger.error(f"NetBox authentication error: {e}")
             return ApplicationResult(
                 success=False,
                 data={},
-                error_message=str(e),
+                error_message=f"Authentication failed: {str(e)}",
+                source='netbox'
+            )
+        except ConnectionError as e:
+            logger.error(f"NetBox connection error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Connection failed: {str(e)}",
+                source='netbox'
+            )
+        except ApplicationError as e:
+            logger.error(f"NetBox API error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"API error: {str(e)}",
+                source='netbox'
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error querying NetBox: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Unexpected error: {str(e)}",
                 source='netbox'
             )
 
@@ -339,22 +454,137 @@ class CheckMKSubmodule(ApplicationSubmodule):
     """CheckMK monitoring system integration submodule."""
 
     def query_ip(self, ip: IPAddress) -> ApplicationResult:
-        """Query CheckMK for monitoring information."""
+        """
+        Query CheckMK for comprehensive monitoring information.
+        
+        Retrieves:
+        - Host information by IP address
+        - Service status and performance data
+        - Alert and notification history
+        - Monitoring configuration and check results
+        
+        Args:
+            ip: IPAddress object to query
+            
+        Returns:
+            ApplicationResult with comprehensive monitoring data
+        """
         try:
-            # Query hosts by IP address
-            hosts_data = self._make_request(f"check_mk/api/1.0/objects/host_config", 
-                                          params={'effective_attributes': 'true'})
-            
-            # Filter hosts by IP address
-            matching_hosts = []
-            for host in hosts_data.get('value', {}).values():
-                if host.get('attributes', {}).get('ipaddress') == str(ip):
-                    matching_hosts.append(host)
-            
             result_data = {
-                'hosts': matching_hosts,
+                'hosts': [],
+                'services': [],
+                'host_status': [],
+                'alerts': [],
+                'notifications': [],
+                'performance_data': [],
+                'check_results': [],
                 'source': 'CheckMK Monitoring'
             }
+            
+            # Query all hosts to find matching IP
+            logger.info(f"Querying CheckMK for hosts with IP: {ip}")
+            try:
+                hosts_response = self._make_request(
+                    "check_mk/api/1.0/domain-types/host_config/collections/all"
+                )
+                
+                # Filter hosts by IP address
+                all_hosts = hosts_response.get('value', [])
+                matching_hosts = []
+                host_names = []
+                
+                for host in all_hosts:
+                    host_attrs = host.get('extensions', {}).get('attributes', {})
+                    if host_attrs.get('ipaddress') == str(ip):
+                        matching_hosts.append(host)
+                        host_names.append(host.get('id', ''))
+                
+                result_data['hosts'] = matching_hosts
+                
+                # If we found matching hosts, query additional information
+                if host_names:
+                    for host_name in host_names:
+                        # Query host status
+                        logger.info(f"Querying CheckMK for host status: {host_name}")
+                        try:
+                            status_response = self._make_request(
+                                f"check_mk/api/1.0/objects/host/{host_name}"
+                            )
+                            result_data['host_status'].append(status_response)
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query host status for {host_name}: {e}")
+                        
+                        # Query services for this host
+                        logger.info(f"Querying CheckMK for services on host: {host_name}")
+                        try:
+                            services_response = self._make_request(
+                                "check_mk/api/1.0/domain-types/service/collections/all",
+                                params={'host_name': host_name}
+                            )
+                            services = services_response.get('value', [])
+                            result_data['services'].extend(services)
+                            
+                            # Extract performance data from services
+                            for service in services:
+                                service_extensions = service.get('extensions', {})
+                                metrics = service_extensions.get('metrics', {})
+                                if metrics:
+                                    result_data['performance_data'].append({
+                                        'host': host_name,
+                                        'service': service.get('id', ''),
+                                        'metrics': metrics
+                                    })
+                                
+                                # Extract check results
+                                check_result = service_extensions.get('check_result', {})
+                                if check_result:
+                                    result_data['check_results'].append({
+                                        'host': host_name,
+                                        'service': service.get('id', ''),
+                                        'result': check_result
+                                    })
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query services for {host_name}: {e}")
+                        
+                        # Query alerts/notifications for this host
+                        logger.info(f"Querying CheckMK for notifications on host: {host_name}")
+                        try:
+                            # Try to get recent notifications
+                            notifications_response = self._make_request(
+                                "check_mk/api/1.0/domain-types/notification/collections/all",
+                                params={'host_name': host_name}
+                            )
+                            notifications = notifications_response.get('value', [])
+                            result_data['notifications'].extend(notifications)
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query notifications for {host_name}: {e}")
+                        
+                        # Query alert history
+                        logger.info(f"Querying CheckMK for alert history on host: {host_name}")
+                        try:
+                            alerts_response = self._make_request(
+                                "check_mk/api/1.0/domain-types/event/collections/all",
+                                params={'host_name': host_name}
+                            )
+                            alerts = alerts_response.get('value', [])
+                            result_data['alerts'].extend(alerts)
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query alerts for {host_name}: {e}")
+                
+            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                logger.error(f"Failed to query CheckMK hosts: {e}")
+                raise
+            
+            # Determine success based on whether we found any data
+            has_data = any([
+                result_data['hosts'],
+                result_data['services'],
+                result_data['host_status'],
+                result_data['alerts'],
+                result_data['notifications'],
+                result_data['performance_data'],
+                result_data['check_results']
+            ])
             
             return ApplicationResult(
                 success=True,
@@ -362,11 +592,36 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 source='checkmk'
             )
             
-        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+        except AuthenticationError as e:
+            logger.error(f"CheckMK authentication error: {e}")
             return ApplicationResult(
                 success=False,
                 data={},
-                error_message=str(e),
+                error_message=f"Authentication failed: {str(e)}",
+                source='checkmk'
+            )
+        except ConnectionError as e:
+            logger.error(f"CheckMK connection error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Connection failed: {str(e)}",
+                source='checkmk'
+            )
+        except ApplicationError as e:
+            logger.error(f"CheckMK API error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"API error: {str(e)}",
+                source='checkmk'
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error querying CheckMK: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Unexpected error: {str(e)}",
                 source='checkmk'
             )
 
@@ -405,16 +660,187 @@ class OpenVASSubmodule(ApplicationSubmodule):
     """OpenVAS vulnerability assessment integration submodule."""
 
     def query_ip(self, ip: IPAddress) -> ApplicationResult:
-        """Query OpenVAS for vulnerability assessment information."""
-        try:
-            # Query targets and reports for the IP
-            targets_data = self._make_request(f"targets", 
-                                            params={'filter': f'hosts={ip}'})
+        """
+        Query OpenVAS for comprehensive vulnerability assessment information.
+        
+        Retrieves:
+        - Target and scan result retrieval by IP address
+        - Vulnerability reports and severity information
+        - Scan history and configuration queries
+        - Threat intelligence and CVE information
+        
+        Args:
+            ip: IPAddress object to query
             
+        Returns:
+            ApplicationResult with comprehensive vulnerability assessment data
+        """
+        try:
             result_data = {
-                'targets': targets_data.get('targets', []),
+                'targets': [],
+                'tasks': [],
+                'reports': [],
+                'results': [],
+                'vulnerabilities': [],
+                'cve_information': [],
+                'scan_history': [],
+                'severity_summary': {},
                 'source': 'OpenVAS Vulnerability Scanner'
             }
+            
+            # Query targets containing this IP address
+            logger.info(f"Querying OpenVAS for targets with IP: {ip}")
+            try:
+                targets_response = self._make_request(
+                    "api/v1/targets",
+                    params={'filter': f'hosts~{ip}'}
+                )
+                targets = targets_response.get('data', []) if isinstance(targets_response, dict) else []
+                result_data['targets'] = targets
+                
+                # For each target, get associated tasks and reports
+                for target in targets:
+                    target_id = target.get('id', '')
+                    if not target_id:
+                        continue
+                    
+                    # Query tasks for this target
+                    logger.info(f"Querying OpenVAS for tasks on target: {target_id}")
+                    try:
+                        tasks_response = self._make_request(
+                            "api/v1/tasks",
+                            params={'filter': f'target_id={target_id}'}
+                        )
+                        tasks = tasks_response.get('data', []) if isinstance(tasks_response, dict) else []
+                        result_data['tasks'].extend(tasks)
+                        
+                        # For each task, get reports and results
+                        for task in tasks:
+                            task_id = task.get('id', '')
+                            if not task_id:
+                                continue
+                            
+                            # Query reports for this task
+                            logger.info(f"Querying OpenVAS for reports on task: {task_id}")
+                            try:
+                                reports_response = self._make_request(
+                                    "api/v1/reports",
+                                    params={'filter': f'task_id={task_id}'}
+                                )
+                                reports = reports_response.get('data', []) if isinstance(reports_response, dict) else []
+                                result_data['reports'].extend(reports)
+                                
+                                # For each report, get detailed results
+                                for report in reports:
+                                    report_id = report.get('id', '')
+                                    if not report_id:
+                                        continue
+                                    
+                                    # Query results for this report
+                                    logger.info(f"Querying OpenVAS for results in report: {report_id}")
+                                    try:
+                                        results_response = self._make_request(
+                                            f"api/v1/reports/{report_id}/results",
+                                            params={'filter': f'host={ip}'}
+                                        )
+                                        results = results_response.get('data', []) if isinstance(results_response, dict) else []
+                                        result_data['results'].extend(results)
+                                        
+                                        # Extract vulnerability and CVE information from results
+                                        for result in results:
+                                            # Extract vulnerability details
+                                            vulnerability = {
+                                                'name': result.get('name', ''),
+                                                'severity': result.get('severity', 0),
+                                                'threat': result.get('threat', ''),
+                                                'description': result.get('description', ''),
+                                                'solution': result.get('solution', ''),
+                                                'port': result.get('port', ''),
+                                                'host': result.get('host', ''),
+                                                'nvt_oid': result.get('nvt', {}).get('oid', ''),
+                                                'cvss_base': result.get('nvt', {}).get('cvss_base', ''),
+                                                'report_id': report_id,
+                                                'task_id': task_id
+                                            }
+                                            result_data['vulnerabilities'].append(vulnerability)
+                                            
+                                            # Extract CVE references
+                                            nvt = result.get('nvt', {})
+                                            refs = nvt.get('refs', {})
+                                            cve_refs = refs.get('ref', []) if isinstance(refs.get('ref'), list) else [refs.get('ref', {})]
+                                            
+                                            for ref in cve_refs:
+                                                if isinstance(ref, dict) and ref.get('type') == 'cve':
+                                                    cve_info = {
+                                                        'cve_id': ref.get('id', ''),
+                                                        'vulnerability_name': result.get('name', ''),
+                                                        'severity': result.get('severity', 0),
+                                                        'host': result.get('host', ''),
+                                                        'port': result.get('port', '')
+                                                    }
+                                                    result_data['cve_information'].append(cve_info)
+                                    
+                                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                                        logger.warning(f"Failed to query results for report {report_id}: {e}")
+                            
+                            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                                logger.warning(f"Failed to query reports for task {task_id}: {e}")
+                    
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query tasks for target {target_id}: {e}")
+            
+            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                logger.error(f"Failed to query OpenVAS targets: {e}")
+                raise
+            
+            # Build scan history from tasks
+            for task in result_data['tasks']:
+                scan_entry = {
+                    'task_id': task.get('id', ''),
+                    'task_name': task.get('name', ''),
+                    'status': task.get('status', ''),
+                    'progress': task.get('progress', 0),
+                    'last_report': task.get('last_report', {}),
+                    'creation_time': task.get('creation_time', ''),
+                    'modification_time': task.get('modification_time', '')
+                }
+                result_data['scan_history'].append(scan_entry)
+            
+            # Calculate severity summary
+            severity_counts = {
+                'critical': 0,
+                'high': 0,
+                'medium': 0,
+                'low': 0,
+                'log': 0
+            }
+            
+            for vuln in result_data['vulnerabilities']:
+                severity = float(vuln.get('severity', 0))
+                threat = vuln.get('threat', '').lower()
+                
+                if severity >= 9.0 or threat == 'critical':
+                    severity_counts['critical'] += 1
+                elif severity >= 7.0 or threat == 'high':
+                    severity_counts['high'] += 1
+                elif severity >= 4.0 or threat == 'medium':
+                    severity_counts['medium'] += 1
+                elif severity > 0.0 or threat == 'low':
+                    severity_counts['low'] += 1
+                else:
+                    severity_counts['log'] += 1
+            
+            result_data['severity_summary'] = severity_counts
+            
+            # Determine success based on whether we found any data
+            has_data = any([
+                result_data['targets'],
+                result_data['tasks'],
+                result_data['reports'],
+                result_data['results'],
+                result_data['vulnerabilities'],
+                result_data['cve_information']
+            ])
             
             return ApplicationResult(
                 success=True,
@@ -422,11 +848,36 @@ class OpenVASSubmodule(ApplicationSubmodule):
                 source='openvas'
             )
             
-        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+        except AuthenticationError as e:
+            logger.error(f"OpenVAS authentication error: {e}")
             return ApplicationResult(
                 success=False,
                 data={},
-                error_message=str(e),
+                error_message=f"Authentication failed: {str(e)}",
+                source='openvas'
+            )
+        except ConnectionError as e:
+            logger.error(f"OpenVAS connection error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Connection failed: {str(e)}",
+                source='openvas'
+            )
+        except ApplicationError as e:
+            logger.error(f"OpenVAS API error: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"API error: {str(e)}",
+                source='openvas'
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error querying OpenVAS: {e}")
+            return ApplicationResult(
+                success=False,
+                data={},
+                error_message=f"Unexpected error: {str(e)}",
                 source='openvas'
             )
 
