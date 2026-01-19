@@ -210,6 +210,18 @@ class ApplicationSubmodule(ABC):
         """Initialize the submodule with configuration."""
         self.config = config
         self.session = requests.Session()
+
+        # Set SSL verification based on config
+        if config and hasattr(config, 'verify_ssl'):
+            self.session.verify = config.verify_ssl
+            if not config.verify_ssl:
+                # Suppress SSL warnings when verification is disabled
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                logger.warning(f"SSL certificate verification disabled for {self.__class__.__name__}")
+        else:
+            self.session.verify = True
+
         if config:
             self._setup_authentication()
 
@@ -259,6 +271,46 @@ class ApplicationSubmodule(ABC):
         Returns:
             ApplicationResult with standardized format
         """
+
+    def _get_source_info(self) -> str:
+        """
+        Get formatted source information including FQDN and port.
+        For CheckMK, also includes the site name.
+
+        Returns:
+            Formatted source string (e.g., "netbox.example.com:443" or "checkmk.example.com:443/site:monitoring")
+        """
+        base_url = self.config.base_url
+        # Extract hostname and port from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        
+        # Get hostname
+        hostname = parsed.hostname or parsed.netloc or base_url
+        
+        # Get port (use default if not specified)
+        port = parsed.port
+        if not port:
+            port = 443 if parsed.scheme == 'https' else 80
+        
+        # For CheckMK, extract site from path
+        site_info = ""
+        if parsed.path and parsed.path.strip('/'):
+            # CheckMK URLs typically have format: https://host/sitename or https://host/site/sitename
+            path_parts = [p for p in parsed.path.strip('/').split('/') if p]
+            if path_parts:
+                # Check if path contains 'site' keyword
+                if 'site' in path_parts:
+                    site_idx = path_parts.index('site')
+                    if site_idx + 1 < len(path_parts):
+                        site_info = f"/site:{path_parts[site_idx + 1]}"
+                else:
+                    # Assume first path component is the site name for CheckMK
+                    # Only add if it looks like a site name (not an API path)
+                    if not path_parts[0].startswith('api') and not path_parts[0].startswith('check_mk'):
+                        site_info = f"/site:{path_parts[0]}"
+        
+        return f"{hostname}:{port}{site_info}"
 
     def _make_request(self, endpoint: str, method: str = 'GET', **kwargs) -> Dict:
         """
@@ -425,7 +477,7 @@ class NetBoxSubmodule(ApplicationSubmodule):
             return ApplicationResult(
                 success=True,
                 data=result_data,
-                source='netbox'
+                source=f"NetBox ({self._get_source_info()})"
             )
 
         except AuthenticationError as e:
@@ -434,7 +486,7 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Authentication failed: {str(e)}",
-                source='netbox'
+                source=f"NetBox ({self._get_source_info()})"
             )
         except ConnectionError as e:
             logger.error(f"NetBox connection error: {e}")
@@ -442,7 +494,7 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Connection failed: {str(e)}",
-                source='netbox'
+                source=f"NetBox ({self._get_source_info()})"
             )
         except ApplicationError as e:
             logger.error(f"NetBox API error: {e}")
@@ -450,7 +502,7 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"API error: {str(e)}",
-                source='netbox'
+                source=f"NetBox ({self._get_source_info()})"
             )
         except Exception as e:
             logger.error(f"Unexpected error querying NetBox: {e}")
@@ -458,7 +510,7 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Unexpected error: {str(e)}",
-                source='netbox'
+                source=f"NetBox ({self._get_source_info()})"
             )
 
 
@@ -493,24 +545,34 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 'source': 'CheckMK Monitoring'
             }
 
-            # Query all hosts to find matching IP
+            # Query all host configs to find matching IP
             logger.info(f"Querying CheckMK for hosts with IP: {ip}")
             try:
+                # Get all host configs which include IP addresses
                 hosts_response = self._make_request(
                     "check_mk/api/1.0/domain-types/host_config/collections/all"
                 )
 
-                # Filter hosts by IP address
                 all_hosts = hosts_response.get('value', [])
+                logger.info(f"CheckMK returned {len(all_hosts)} host configs")
+                
                 matching_hosts = []
                 host_names = []
 
+                # Search through host configs for matching IP
                 for host in all_hosts:
+                    host_id = host.get('id', 'unknown')
+                    
+                    # Extract IP from host configuration
                     host_attrs = host.get('extensions', {}).get('attributes', {})
-                    if host_attrs.get('ipaddress') == str(ip):
+                    host_ip = host_attrs.get('ipaddress')
+                    
+                    if host_ip == str(ip):
+                        logger.info(f"Found matching host: {host_id} with IP {host_ip}")
                         matching_hosts.append(host)
-                        host_names.append(host.get('id', ''))
+                        host_names.append(host_id)
 
+                logger.info(f"Found {len(matching_hosts)} matching hosts for IP {ip}")
                 result_data['hosts'] = matching_hosts
 
                 # If we found matching hosts, query additional information
@@ -533,7 +595,10 @@ class CheckMKSubmodule(ApplicationSubmodule):
                         try:
                             services_response = self._make_request(
                                 "check_mk/api/1.0/domain-types/service/collections/all",
-                                params={'host_name': host_name}
+                                params={
+                                    'host_name': host_name,
+                                    'columns': ['state', 'plugin_output', 'perf_data']
+                                }
                             )
                             services = services_response.get('value', [])
                             result_data['services'].extend(services)
@@ -609,7 +674,7 @@ class CheckMKSubmodule(ApplicationSubmodule):
             return ApplicationResult(
                 success=True,
                 data=result_data,
-                source='checkmk'
+                source=f"CheckMK ({self._get_source_info()})"
             )
 
         except AuthenticationError as e:
@@ -618,7 +683,7 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Authentication failed: {str(e)}",
-                source='checkmk'
+                source=f"CheckMK ({self._get_source_info()})"
             )
         except ConnectionError as e:
             logger.error(f"CheckMK connection error: {e}")
@@ -626,7 +691,7 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Connection failed: {str(e)}",
-                source='checkmk'
+                source=f"CheckMK ({self._get_source_info()})"
             )
         except ApplicationError as e:
             logger.error(f"CheckMK API error: {e}")
@@ -634,7 +699,7 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"API error: {str(e)}",
-                source='checkmk'
+                source=f"CheckMK ({self._get_source_info()})"
             )
         except Exception as e:
             logger.error(f"Unexpected error querying CheckMK: {e}")
@@ -642,7 +707,7 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Unexpected error: {str(e)}",
-                source='checkmk'
+                source=f"CheckMK ({self._get_source_info()})"
             )
 
 
@@ -664,7 +729,7 @@ class OpenITCockpitSubmodule(ApplicationSubmodule):
             return ApplicationResult(
                 success=True,
                 data=result_data,
-                source='openitcockpit'
+                source=f"OpenITCockpit ({self._get_source_info()})"
             )
 
         except (AuthenticationError, ConnectionError, ApplicationError) as e:
@@ -672,7 +737,7 @@ class OpenITCockpitSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=str(e),
-                source='openitcockpit'
+                source=f"OpenITCockpit ({self._get_source_info()})"
             )
 
 
@@ -883,7 +948,7 @@ class OpenVASSubmodule(ApplicationSubmodule):
             return ApplicationResult(
                 success=True,
                 data=result_data,
-                source='openvas'
+                source=f"OpenVAS ({self._get_source_info()})"
             )
 
         except AuthenticationError as e:
@@ -892,7 +957,7 @@ class OpenVASSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Authentication failed: {str(e)}",
-                source='openvas'
+                source=f"OpenVAS ({self._get_source_info()})"
             )
         except ConnectionError as e:
             logger.error(f"OpenVAS connection error: {e}")
@@ -900,7 +965,7 @@ class OpenVASSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Connection failed: {str(e)}",
-                source='openvas'
+                source=f"OpenVAS ({self._get_source_info()})"
             )
         except ApplicationError as e:
             logger.error(f"OpenVAS API error: {e}")
@@ -908,7 +973,7 @@ class OpenVASSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"API error: {str(e)}",
-                source='openvas'
+                source=f"OpenVAS ({self._get_source_info()})"
             )
         except Exception as e:
             logger.error(f"Unexpected error querying OpenVAS: {e}")
@@ -916,7 +981,7 @@ class OpenVASSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=f"Unexpected error: {str(e)}",
-                source='openvas'
+                source=f"OpenVAS ({self._get_source_info()})"
             )
 
 
@@ -943,7 +1008,7 @@ class InfobloxSubmodule(ApplicationSubmodule):
             return ApplicationResult(
                 success=True,
                 data=result_data,
-                source='infoblox'
+                source=f"Infoblox ({self._get_source_info()})"
             )
 
         except (AuthenticationError, ConnectionError, ApplicationError) as e:
@@ -951,7 +1016,7 @@ class InfobloxSubmodule(ApplicationSubmodule):
                 success=False,
                 data={},
                 error_message=str(e),
-                source='infoblox'
+                source=f"Infoblox ({self._get_source_info()})"
             )
 
 
@@ -968,7 +1033,8 @@ class ApplicationModule:
     }
 
     def __init__(self, credential_file_or_configurations=None,
-                 configurations: Optional[Dict[str, AuthenticationConfig]] = None):
+                 configurations: Optional[Dict[str, AuthenticationConfig]] = None,
+                 verify_ssl: bool = True):
         """
         Initialize the application module.
 
@@ -976,6 +1042,7 @@ class ApplicationModule:
             credential_file_or_configurations: Either a path to credential configuration file (str)
                                              or a dictionary of configurations (for backward compatibility)
             configurations: Dictionary mapping submodule names to their configurations (deprecated, use first arg)
+            verify_ssl: Whether to verify SSL certificates (default: True)
         """
         # Handle backward compatibility
         if isinstance(credential_file_or_configurations, dict):
@@ -992,6 +1059,7 @@ class ApplicationModule:
                 credential_file_or_configurations)
             self.configurations = {}
 
+        self.verify_ssl = verify_ssl
         self.loaded_submodules: Dict[str, ApplicationSubmodule] = {}
 
     def load_submodule(self, name: str) -> Optional[ApplicationSubmodule]:
@@ -1030,6 +1098,10 @@ class ApplicationModule:
                 # Create submodule without configuration for testing
                 submodule = submodule_class()
             else:
+                # Override verify_ssl if specified at module level
+                if hasattr(config, 'verify_ssl') and not self.verify_ssl:
+                    config.verify_ssl = self.verify_ssl
+
                 submodule = submodule_class(config)
 
             self.loaded_submodules[name] = submodule

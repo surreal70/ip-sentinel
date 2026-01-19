@@ -7,6 +7,7 @@ import subprocess
 import platform
 import re
 import logging
+import ipaddress
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv6Address, ip_interface
 from typing import Dict, List, Optional, Union, Any
@@ -73,15 +74,47 @@ class LocalInfoResult:
     ssl_results: List[SSLResult]
     traceroute_results: List[TracerouteResult]
     reverse_dns: Optional[str] = None
+    nat_detection: Optional[Dict[str, Any]] = None
 
 
 class LocalInfoModule:
     """Module for gathering information from the local network environment."""
 
-    def __init__(self):
-        """Initialize the local info module."""
+    def __init__(self, run_root: bool = False, enable_nat_detection: bool = True, verify_ssl: bool = True):
+        """
+        Initialize the local info module.
+
+        Args:
+            run_root: Whether to run tests requiring root/administrator privileges
+            enable_nat_detection: Whether to enable NAT detection for RFC 1918 addresses
+            verify_ssl: Whether to verify SSL certificates (default: True)
+        """
         self.nm = nmap.PortScanner()
         self._mac_vendor_cache = {}
+        self.run_root = run_root
+        self.enable_nat_detection = enable_nat_detection
+        self.verify_ssl = verify_ssl
+
+    @staticmethod
+    def has_root_privileges() -> bool:
+        """
+        Check if the current process has root/administrator privileges.
+
+        Returns:
+            True if running with elevated privileges, False otherwise
+        """
+        import os
+        system = platform.system().lower()
+
+        if system == "windows":
+            try:
+                import ctypes
+                return ctypes.windll.shell32.IsUserAnAdmin() != 0
+            except Exception:
+                return False
+        else:
+            # Unix-like systems
+            return os.geteuid() == 0
 
     def analyze(self, ip: IPAddress) -> LocalInfoResult:
         """
@@ -115,6 +148,11 @@ class LocalInfoModule:
         # Perform reverse DNS lookup
         reverse_dns = self._reverse_dns_lookup(ip)
 
+        # Perform NAT detection for RFC 1918 addresses
+        nat_detection = None
+        if self.enable_nat_detection and self._is_rfc1918_address(ip):
+            nat_detection = self._detect_nat(ip)
+
         # Analyze SSL services if web/mail ports are found
         ssl_results = []
         if nmap_results.open_ports:
@@ -129,7 +167,8 @@ class LocalInfoModule:
             nmap_results=nmap_results,
             ssl_results=ssl_results,
             traceroute_results=traceroute_results,
-            reverse_dns=reverse_dns
+            reverse_dns=reverse_dns,
+            nat_detection=nat_detection
         )
 
     def _is_local_subnet(self, ip: IPAddress) -> bool:
@@ -344,12 +383,31 @@ class LocalInfoModule:
         try:
             ip_str = str(ip)
 
-            # Perform comprehensive scan
-            # -sS: SYN scan, -O: OS detection, -sV: Service version detection
-            # -p-: All ports (can be limited for performance)
-            scan_args = f"-sS -O -sV -p 1-1000 {ip_str}"
+            # Determine scan arguments based on privilege level
+            has_root = self.has_root_privileges()
 
-            logger.info(f"Starting nmap scan: {scan_args}")
+            if self.run_root and has_root:
+                # Full scan with OS detection (requires root)
+                # -sS: SYN scan, -O: OS detection, -sV: Service version detection
+                # -p-: All ports (can be limited for performance)
+                scan_args = f"-sS -O -sV -p 1-1000 {ip_str}"
+                logger.info(f"Starting privileged nmap scan: {scan_args}")
+            elif self.run_root and not has_root:
+                # User requested root tests but doesn't have privileges
+                logger.warning(
+                    f"--run-root specified but no root privileges detected. "
+                    f"Skipping OS detection and SYN scan for {ip_str}")
+                # Fall back to unprivileged scan
+                scan_args = f"-sT -sV -p 1-1000 {ip_str}"
+                logger.info(f"Starting unprivileged nmap scan: {scan_args}")
+            else:
+                # Unprivileged scan (no OS detection, TCP connect scan)
+                # -sT: TCP connect scan (doesn't require root)
+                # -sV: Service version detection
+                scan_args = f"-sT -sV -p 1-1000 {ip_str}"
+                logger.info(
+                    f"Starting unprivileged nmap scan (use --run-root for OS detection): {scan_args}")
+
             self.nm.scan(hosts=ip_str, arguments=scan_args)
 
             if ip_str not in self.nm.all_hosts():
@@ -362,13 +420,19 @@ class LocalInfoModule:
 
             host_info = self.nm[ip_str]
 
-            # Extract OS detection info
+            # Extract OS detection info (only available with -O flag)
             os_detection = {}
             if 'osmatch' in host_info:
                 os_detection = {
                     'matches': host_info['osmatch'],
                     'fingerprint': host_info.get('osfingerprint', [])
                 }
+            elif self.run_root and has_root:
+                # OS detection was attempted but no results
+                os_detection = {'note': 'OS detection attempted but no matches found'}
+            else:
+                # OS detection was skipped
+                os_detection = {'note': 'OS detection skipped (requires --run-root flag)'}
 
             # Extract open ports and services
             open_ports = []
@@ -464,7 +528,7 @@ class LocalInfoModule:
                 ScanCommand.TLS_FALLBACK_SCSV,
                 ScanCommand.SESSION_RENEGOTIATION,
                 ScanCommand.TLS_COMPRESSION,
-                ScanCommand.EARLY_DATA
+                ScanCommand.TLS_1_3_EARLY_DATA
             }
 
             # Create scan requests for all ports
@@ -525,18 +589,20 @@ class LocalInfoModule:
     def _extract_certificate_info(self, scan_result) -> Optional[Dict[str, Any]]:
         """Extract certificate information from sslyze result."""
         try:
-            cert_info = scan_result.scan_result.certificate_info
-            if cert_info and cert_info.certificate_deployments:
-                cert = cert_info.certificate_deployments[0].received_certificate_chain[0]
-                return {
-                    'subject': str(cert.subject),
-                    'issuer': str(cert.issuer),
-                    'serial_number': str(cert.serial_number),
-                    'not_valid_before': cert.not_valid_before.isoformat(),
-                    'not_valid_after': cert.not_valid_after.isoformat(),
-                }
-        except Exception:
-            pass
+            cert_scan = scan_result.scan_result.certificate_info
+            if cert_scan and hasattr(cert_scan, 'result') and cert_scan.result:
+                cert_info = cert_scan.result
+                if cert_info.certificate_deployments:
+                    cert = cert_info.certificate_deployments[0].received_certificate_chain[0]
+                    return {
+                        'subject': str(cert.subject),
+                        'issuer': str(cert.issuer),
+                        'serial_number': str(cert.serial_number),
+                        'not_valid_before': cert.not_valid_before.isoformat(),
+                        'not_valid_after': cert.not_valid_after.isoformat(),
+                    }
+        except Exception as e:
+            logger.debug(f"Error extracting certificate info: {e}")
         return None
 
     def _extract_cipher_suites(self, scan_result) -> List[str]:
@@ -553,15 +619,13 @@ class LocalInfoModule:
 
             for version in tls_versions:
                 if hasattr(scan_result.scan_result, version):
-                    cipher_result = getattr(scan_result.scan_result, version)
-                    if cipher_result and hasattr(
-                            cipher_result, 'accepted_cipher_suites'):
-                        for cipher in cipher_result.accepted_cipher_suites:
-                            cipher_name = f"{
-                                version.replace(
-                                    '_cipher_suites', '').upper()}: {
-                                cipher.cipher_suite.name}"
-                            cipher_suites.append(cipher_name)
+                    cipher_scan = getattr(scan_result.scan_result, version)
+                    if cipher_scan and hasattr(cipher_scan, 'result') and cipher_scan.result:
+                        cipher_result = cipher_scan.result
+                        if hasattr(cipher_result, 'accepted_cipher_suites'):
+                            for cipher in cipher_result.accepted_cipher_suites:
+                                cipher_name = f"{version.replace('_cipher_suites', '').upper()}: {cipher.cipher_suite.name}"
+                                cipher_suites.append(cipher_name)
 
         except Exception as e:
             logger.warning(f"Error extracting cipher suites: {e}")
@@ -721,56 +785,61 @@ class LocalInfoModule:
         try:
             # Check for SSL 2.0 (deprecated and insecure)
             if hasattr(scan_result.scan_result, 'ssl_2_0_cipher_suites'):
-                ssl2_result = scan_result.scan_result.ssl_2_0_cipher_suites
-                if ssl2_result and ssl2_result.accepted_cipher_suites:
-                    vulnerabilities.append("SSL 2.0 enabled (CRITICAL)")
+                ssl2_scan = scan_result.scan_result.ssl_2_0_cipher_suites
+                if ssl2_scan and hasattr(ssl2_scan, 'result') and ssl2_scan.result:
+                    if ssl2_scan.result.accepted_cipher_suites:
+                        vulnerabilities.append("SSL 2.0 enabled (CRITICAL)")
 
             # Check for SSL 3.0 (deprecated due to POODLE)
             if hasattr(scan_result.scan_result, 'ssl_3_0_cipher_suites'):
-                ssl3_result = scan_result.scan_result.ssl_3_0_cipher_suites
-                if ssl3_result and ssl3_result.accepted_cipher_suites:
-                    vulnerabilities.append(
-                        "SSL 3.0 enabled (HIGH - POODLE vulnerability)")
+                ssl3_scan = scan_result.scan_result.ssl_3_0_cipher_suites
+                if ssl3_scan and hasattr(ssl3_scan, 'result') and ssl3_scan.result:
+                    if ssl3_scan.result.accepted_cipher_suites:
+                        vulnerabilities.append("SSL 3.0 enabled (HIGH - POODLE vulnerability)")
 
             # Check for weak TLS versions
             if hasattr(scan_result.scan_result, 'tls_1_0_cipher_suites'):
-                tls10_result = scan_result.scan_result.tls_1_0_cipher_suites
-                if tls10_result and tls10_result.accepted_cipher_suites:
-                    vulnerabilities.append("TLS 1.0 enabled (MEDIUM - deprecated)")
+                tls10_scan = scan_result.scan_result.tls_1_0_cipher_suites
+                if tls10_scan and hasattr(tls10_scan, 'result') and tls10_scan.result:
+                    if tls10_scan.result.accepted_cipher_suites:
+                        vulnerabilities.append("TLS 1.0 enabled (MEDIUM - deprecated)")
 
             if hasattr(scan_result.scan_result, 'tls_1_1_cipher_suites'):
-                tls11_result = scan_result.scan_result.tls_1_1_cipher_suites
-                if tls11_result and tls11_result.accepted_cipher_suites:
-                    vulnerabilities.append("TLS 1.1 enabled (MEDIUM - deprecated)")
+                tls11_scan = scan_result.scan_result.tls_1_1_cipher_suites
+                if tls11_scan and hasattr(tls11_scan, 'result') and tls11_scan.result:
+                    if tls11_scan.result.accepted_cipher_suites:
+                        vulnerabilities.append("TLS 1.1 enabled (MEDIUM - deprecated)")
 
             # Check for Heartbleed vulnerability
             if hasattr(scan_result.scan_result, 'heartbleed'):
-                heartbleed_result = scan_result.scan_result.heartbleed
-                if heartbleed_result and heartbleed_result.is_vulnerable_to_heartbleed:
-                    vulnerabilities.append("Heartbleed vulnerability (CRITICAL)")
+                heartbleed_scan = scan_result.scan_result.heartbleed
+                if heartbleed_scan and hasattr(heartbleed_scan, 'result') and heartbleed_scan.result:
+                    if heartbleed_scan.result.is_vulnerable_to_heartbleed:
+                        vulnerabilities.append("Heartbleed vulnerability (CRITICAL)")
 
             # Check for OpenSSL CCS Injection
             if hasattr(scan_result.scan_result, 'openssl_ccs_injection'):
-                ccs_result = scan_result.scan_result.openssl_ccs_injection
-                if ccs_result and ccs_result.is_vulnerable_to_ccs_injection:
-                    vulnerabilities.append("OpenSSL CCS Injection vulnerability (HIGH)")
+                ccs_scan = scan_result.scan_result.openssl_ccs_injection
+                if ccs_scan and hasattr(ccs_scan, 'result') and ccs_scan.result:
+                    if ccs_scan.result.is_vulnerable_to_ccs_injection:
+                        vulnerabilities.append("OpenSSL CCS Injection vulnerability (HIGH)")
 
             # Check for TLS compression (CRIME attack)
             if hasattr(scan_result.scan_result, 'tls_compression'):
-                compression_result = scan_result.scan_result.tls_compression
-                if compression_result and compression_result.supports_compression:
-                    vulnerabilities.append(
-                        "TLS compression enabled (MEDIUM - CRIME attack)")
+                compression_scan = scan_result.scan_result.tls_compression
+                if compression_scan and hasattr(compression_scan, 'result') and compression_scan.result:
+                    if compression_scan.result.supports_compression:
+                        vulnerabilities.append("TLS compression enabled (MEDIUM - CRIME attack)")
 
             # Check for insecure renegotiation
             if hasattr(scan_result.scan_result, 'session_renegotiation'):
-                renegotiation_result = scan_result.scan_result.session_renegotiation
-                if renegotiation_result:
+                renegotiation_scan = scan_result.scan_result.session_renegotiation
+                if renegotiation_scan and hasattr(renegotiation_scan, 'result') and renegotiation_scan.result:
+                    renegotiation_result = renegotiation_scan.result
                     if not renegotiation_result.supports_secure_renegotiation:
                         vulnerabilities.append("Insecure renegotiation (MEDIUM)")
                     if renegotiation_result.is_vulnerable_to_client_renegotiation_dos:
-                        vulnerabilities.append(
-                            "Client renegotiation DoS vulnerability (MEDIUM)")
+                        vulnerabilities.append("Client renegotiation DoS vulnerability (MEDIUM)")
 
             # Check for weak cipher suites
             weak_ciphers = self._check_weak_cipher_suites(scan_result)
@@ -803,17 +872,17 @@ class LocalInfoModule:
 
         for version in tls_versions:
             if hasattr(scan_result.scan_result, version):
-                cipher_result = getattr(scan_result.scan_result, version)
-                if cipher_result and cipher_result.accepted_cipher_suites:
-                    for cipher in cipher_result.accepted_cipher_suites:
-                        cipher_name = cipher.cipher_suite.name
-                        for weak_pattern in weak_patterns:
-                            if weak_pattern in cipher_name.upper():
-                                severity = "HIGH" if weak_pattern in [
-                                    'NULL', 'EXPORT', 'DES'] else "MEDIUM"
-                                weak_ciphers.append(
-                                    f"Weak cipher {cipher_name} ({severity})")
-                                break
+                cipher_scan = getattr(scan_result.scan_result, version)
+                if cipher_scan and hasattr(cipher_scan, 'result') and cipher_scan.result:
+                    cipher_result = cipher_scan.result
+                    if hasattr(cipher_result, 'accepted_cipher_suites') and cipher_result.accepted_cipher_suites:
+                        for cipher in cipher_result.accepted_cipher_suites:
+                            cipher_name = cipher.cipher_suite.name
+                            for weak_pattern in weak_patterns:
+                                if weak_pattern in cipher_name.upper():
+                                    severity = "HIGH" if weak_pattern in ['NULL', 'EXPORT', 'DES'] else "MEDIUM"
+                                    weak_ciphers.append(f"Weak cipher {cipher_name} ({severity})")
+                                    break
 
         return weak_ciphers
 
@@ -823,42 +892,41 @@ class LocalInfoModule:
 
         try:
             if hasattr(scan_result.scan_result, 'certificate_info'):
-                cert_info = scan_result.scan_result.certificate_info
-                if cert_info and cert_info.certificate_deployments:
-                    deployment = cert_info.certificate_deployments[0]
-                    cert = deployment.received_certificate_chain[0]
+                cert_scan = scan_result.scan_result.certificate_info
+                if cert_scan and hasattr(cert_scan, 'result') and cert_scan.result:
+                    cert_info = cert_scan.result
+                    if cert_info.certificate_deployments:
+                        deployment = cert_info.certificate_deployments[0]
+                        cert = deployment.received_certificate_chain[0]
 
-                    # Check certificate expiration
-                    from datetime import datetime, timezone
-                    now = datetime.now(timezone.utc)
+                        # Check certificate expiration
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
 
-                    if cert.not_valid_after < now:
-                        cert_issues.append("Certificate expired (HIGH)")
-                    elif (cert.not_valid_after - now).days < 30:
-                        cert_issues.append("Certificate expires soon (MEDIUM)")
+                        if cert.not_valid_after < now:
+                            cert_issues.append("Certificate expired (HIGH)")
+                        elif (cert.not_valid_after - now).days < 30:
+                            cert_issues.append("Certificate expires soon (MEDIUM)")
 
-                    # Check for weak signature algorithm
-                    if hasattr(cert, 'signature_algorithm_oid'):
-                        sig_alg = str(cert.signature_algorithm_oid)
-                        if 'md5' in sig_alg.lower() or 'sha1' in sig_alg.lower():
-                            cert_issues.append(
-                                "Weak certificate signature algorithm (MEDIUM)")
+                        # Check for weak signature algorithm
+                        if hasattr(cert, 'signature_algorithm_oid'):
+                            sig_alg = str(cert.signature_algorithm_oid)
+                            if 'md5' in sig_alg.lower() or 'sha1' in sig_alg.lower():
+                                cert_issues.append("Weak certificate signature algorithm (MEDIUM)")
 
-                    # Check key size
-                    if hasattr(cert, 'public_key'):
-                        try:
-                            key = cert.public_key()
-                            if hasattr(key, 'key_size'):
-                                if key.key_size < 2048:
-                                    cert_issues.append(
-                                        f"Weak certificate key size: {
-                                            key.key_size} bits (HIGH)")
-                        except Exception:
-                            pass
+                        # Check key size
+                        if hasattr(cert, 'public_key'):
+                            try:
+                                key = cert.public_key()
+                                if hasattr(key, 'key_size'):
+                                    if key.key_size < 2048:
+                                        cert_issues.append(f"Weak certificate key size: {key.key_size} bits (HIGH)")
+                            except Exception:
+                                pass
 
-                    # Check for self-signed certificate
-                    if cert.issuer == cert.subject:
-                        cert_issues.append("Self-signed certificate (LOW)")
+                        # Check for self-signed certificate
+                        if cert.issuer == cert.subject:
+                            cert_issues.append("Self-signed certificate (LOW)")
 
         except Exception as e:
             logger.warning(f"Error checking certificate issues: {e}")
@@ -1047,3 +1115,105 @@ class LocalInfoModule:
             return hostname
         except Exception:
             return None
+
+    def _is_rfc1918_address(self, ip: IPAddress) -> bool:
+        """
+        Check if IP address is an RFC 1918 private address.
+
+        Args:
+            ip: IP address to check
+
+        Returns:
+            True if address is RFC 1918 private, False otherwise
+        """
+        if not isinstance(ip, IPv4Address):
+            return False
+
+        # RFC 1918 private address ranges
+        private_ranges = [
+            ipaddress.ip_network('10.0.0.0/8'),
+            ipaddress.ip_network('172.16.0.0/12'),
+            ipaddress.ip_network('192.168.0.0/16')
+        ]
+
+        return any(ip in network for network in private_ranges)
+
+    def _detect_nat(self, ip: IPAddress) -> Dict[str, Any]:
+        """
+        Detect NAT for RFC 1918 private IP addresses.
+
+        This method queries an external service to determine the public IP address
+        and compares it with the private IP to identify NAT.
+
+        Args:
+            ip: Private IP address to check for NAT
+
+        Returns:
+            Dictionary with NAT detection results
+        """
+        nat_result = {
+            'detected': False,
+            'private_ip': str(ip),
+            'public_ip': None,
+            'nat_type': None,
+            'error': None
+        }
+
+        try:
+            import requests
+
+            # Query external service to get public IP
+            # Using multiple services for reliability
+            services = [
+                'https://api.ipify.org?format=json',
+                'https://ifconfig.me/ip',
+                'https://icanhazip.com'
+            ]
+
+            public_ip = None
+            for service in services:
+                try:
+                    # Use session verify setting if available, otherwise default to True
+                    verify_ssl = getattr(self, 'verify_ssl', True)
+                    response = requests.get(service, timeout=5, verify=verify_ssl)
+                    if response.status_code == 200:
+                        if 'json' in service:
+                            public_ip = response.json().get('ip')
+                        else:
+                            public_ip = response.text.strip()
+
+                        # Validate the IP address
+                        ipaddress.ip_address(public_ip)
+                        break
+                except Exception as e:
+                    logger.debug(f"Failed to query {service}: {e}")
+                    continue
+
+            if not public_ip:
+                nat_result['error'] = "Unable to determine public IP address"
+                return nat_result
+
+            nat_result['public_ip'] = public_ip
+
+            # Compare private and public IPs
+            if str(ip) != public_ip:
+                nat_result['detected'] = True
+
+                # Attempt to determine NAT type
+                # This is a simplified detection - full NAT type detection requires more complex testing
+                nat_result['nat_type'] = 'NAT detected (likely SNAT/PAT)'
+
+                logger.info(f"NAT detected: {ip} -> {public_ip}")
+            else:
+                # This shouldn't happen for RFC 1918 addresses, but handle it
+                nat_result['detected'] = False
+                nat_result['error'] = "Private IP matches public IP (unexpected)"
+
+        except ImportError:
+            nat_result['error'] = "requests library not available for NAT detection"
+            logger.warning("NAT detection requires requests library")
+        except Exception as e:
+            nat_result['error'] = f"NAT detection failed: {str(e)}"
+            logger.error(f"NAT detection error: {e}")
+
+        return nat_result
