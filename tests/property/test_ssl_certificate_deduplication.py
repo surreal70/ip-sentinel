@@ -10,7 +10,7 @@ from ipaddress import IPv4Address, IPv6Address
 from unittest.mock import patch, MagicMock
 from typing import List, Dict, Any
 
-from src.ip_mana.modules.local_info import LocalInfoModule, SSLResult
+from src.ip_sentinel.modules.local_info import LocalInfoModule, SSLResult
 
 
 # Strategy for generating valid IP addresses

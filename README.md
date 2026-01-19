@@ -1,4 +1,4 @@
-# IP Intelligence Analyzer (IP-ManA)
+# IP-Sentinel
 
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
@@ -7,7 +7,7 @@
 [![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows/)
 
-A comprehensive Python console application for gathering intelligence about IP addresses through multiple specialized analysis modules. IP-ManA combines local network analysis, internet-based lookups, and enterprise application integration to provide a complete picture of any IP address.
+A comprehensive Python console application for gathering intelligence about IP addresses through multiple specialized analysis modules. IP-Sentinel combines local network analysis, internet-based lookups, and enterprise application integration to provide a complete picture of any IP address.
 
 ## 🛠️ Technology Stack
 
@@ -100,8 +100,8 @@ pip install .
 
 5. **Verify installation**:
 ```bash
-ip-mana --version
-ip-mana --help
+ip-sentinel --version
+ip-sentinel --help
 ```
 
 ### Installing External Tools
@@ -133,7 +133,7 @@ Download from [nmap.org](https://nmap.org/download.html) and install.
 
 #### Classification Rules
 
-On first run, IP-ManA creates a default classification configuration file:
+On first run, IP-Sentinel creates a default classification configuration file:
 ```
 classifications.json
 ```
@@ -158,51 +158,51 @@ Edit `config/app_credentials.json` with your actual credentials for NetBox, Chec
 
 **Analyze an IP address** (default: human-readable output, dense mode):
 ```bash
-ip-mana 192.168.1.1
+ip-sentinel 192.168.1.1
 ```
 
 **Analyze with JSON output**:
 ```bash
-ip-mana --json 192.168.1.1
+ip-sentinel --json 192.168.1.1
 ```
 
 **Analyze with HTML output**:
 ```bash
-ip-mana --html 192.168.1.1 > report.html
+ip-sentinel --html 192.168.1.1 > report.html
 ```
 
 **Full reporting mode** (show all tests, including empty results):
 ```bash
-ip-mana --full 192.168.1.1
+ip-sentinel --full 192.168.1.1
 ```
 
 **Full-error mode** (include error messages and timeouts):
 ```bash
-ip-mana --full-err 192.168.1.1
+ip-sentinel --full-err 192.168.1.1
 ```
 
 ### Advanced Usage
 
 **Force internet module** (even for private IPs):
 ```bash
-ip-mana --force-internet 192.168.1.1
+ip-sentinel --force-internet 192.168.1.1
 # or
-ip-mana --force-module3 192.168.1.1
+ip-sentinel --force-module3 192.168.1.1
 ```
 
 **Custom database location**:
 ```bash
-ip-mana --database /path/to/custom.db 192.168.1.1
+ip-sentinel --database /path/to/custom.db 192.168.1.1
 ```
 
 **Disable database storage**:
 ```bash
-ip-mana --no-database 192.168.1.1
+ip-sentinel --no-database 192.168.1.1
 ```
 
 **Verbose output** (for debugging):
 ```bash
-ip-mana --verbose 192.168.1.1
+ip-sentinel --verbose 192.168.1.1
 ```
 
 ### Module 4: Application Integration
@@ -211,69 +211,69 @@ Module 4 requires explicit specification of submodules:
 
 **Query NetBox IPAM**:
 ```bash
-ip-mana --netbox 192.168.1.1
+ip-sentinel --netbox 192.168.1.1
 ```
 
 **Query CheckMK monitoring**:
 ```bash
-ip-mana --checkmk 192.168.1.1
+ip-sentinel --checkmk 192.168.1.1
 ```
 
 **Query OpenVAS vulnerability scanner**:
 ```bash
-ip-mana --openvas 192.168.1.1
+ip-sentinel --openvas 192.168.1.1
 ```
 
 **Query multiple application modules**:
 ```bash
-ip-mana --netbox --checkmk --openvas 192.168.1.1
+ip-sentinel --netbox --checkmk --openvas 192.168.1.1
 ```
 
 **Specify custom credentials file**:
 ```bash
-ip-mana --credentials /path/to/credentials.json --netbox 192.168.1.1
+ip-sentinel --credentials /path/to/credentials.json --netbox 192.168.1.1
 ```
 
 ### Classification Management
 
 **Add a custom classification**:
 ```bash
-ip-mana --add-classification "Custom Range" 10.50.0.0/16 "My custom network" "module2,module3"
+ip-sentinel --add-classification "Custom Range" 10.50.0.0/16 "My custom network" "module2,module3"
 ```
 
 **Delete a classification**:
 ```bash
-ip-mana --delete-classification "Custom Range"
+ip-sentinel --delete-classification "Custom Range"
 ```
 
 **List all classifications**:
 ```bash
-ip-mana --list-classifications
+ip-sentinel --list-classifications
 ```
 
 ### Examples
 
 **Analyze a public IP with full details**:
 ```bash
-ip-mana --full --json 8.8.8.8 > google-dns-analysis.json
+ip-sentinel --full --json 8.8.8.8 > google-dns-analysis.json
 ```
 
 **Scan local network device with all modules**:
 ```bash
-ip-mana --full-err --netbox --checkmk 192.168.1.100
+ip-sentinel --full-err --netbox --checkmk 192.168.1.100
 ```
 
 **Quick check of multiple IPs** (using shell loop):
 ```bash
 for ip in 192.168.1.{1..10}; do
     echo "Analyzing $ip..."
-    ip-mana --dense $ip
+    ip-sentinel --dense $ip
 done
 ```
 
 **Analyze IPv6 address**:
 ```bash
-ip-mana 2001:4860:4860::8888
+ip-sentinel 2001:4860:4860::8888
 ```
 
 ### Output Format Examples
@@ -390,7 +390,7 @@ pytest tests/integration/
 
 **Run with coverage**:
 ```bash
-pytest --cov=ip_mana --cov-report=html
+pytest --cov=ip_sentinel --cov-report=html
 ```
 
 **Run specific test**:
@@ -407,7 +407,7 @@ pytest tests/property/ --hypothesis-show-statistics
 
 ```
 ip-intelligence-analyzer/
-├── src/ip_mana/              # Main application code
+├── src/ip_sentinel/              # Main application code
 │   ├── __init__.py
 │   ├── cli.py                # Command-line interface
 │   ├── analyzer.py           # Main controller
@@ -462,7 +462,7 @@ pytest tests/unit/test_my_feature.py
 3. **Implement the feature**:
 ```bash
 # Create implementation file
-touch src/ip_mana/my_feature.py
+touch src/ip_sentinel/my_feature.py
 # Implement feature
 # Run tests (they should pass)
 pytest tests/unit/test_my_feature.py
@@ -600,7 +600,7 @@ We welcome contributions! Please follow these guidelines:
 
 ### Common Issues
 
-**Issue**: `ModuleNotFoundError: No module named 'ip_mana'`
+**Issue**: `ModuleNotFoundError: No module named 'ip_sentinel'`
 **Solution**: Install the package with `pip install -e .`
 
 **Issue**: `nmap: command not found`
@@ -668,13 +668,13 @@ We welcome contributions! Please follow these guidelines:
 
 ## ❓ Frequently Asked Questions
 
-**Q: Do I need root privileges to run IP-ManA?**
+**Q: Do I need root privileges to run IP-Sentinel?**
 A: No, but some nmap features in Module 2 require root/administrator privileges.
 
 **Q: Can I analyze multiple IPs at once?**
 A: Currently, one IP per invocation. Use shell scripts for batch processing.
 
-**Q: Does IP-ManA work offline?**
+**Q: Does IP-Sentinel work offline?**
 A: Modules 1 and 2 work offline. Module 3 requires internet. Module 4 requires network access to enterprise systems.
 
 **Q: How is data stored?**
@@ -683,7 +683,7 @@ A: In a SQLite database (default: `ip_analysis.db` in current directory).
 **Q: Can I customize the classification rules?**
 A: Yes, use `--add-classification` and `--delete-classification` commands.
 
-**Q: Is IP-ManA suitable for production use?**
+**Q: Is IP-Sentinel suitable for production use?**
 A: Yes, but review security considerations and test thoroughly in your environment.
 
 **Q: What about IPv6 support?**

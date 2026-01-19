@@ -2,11 +2,11 @@
 
 ## Introduction
 
-IP-ManA is a Python console application that gathers comprehensive intelligence about IP addresses through multiple analysis modules. The system provides flexible output formats, persistent storage, and modular architecture for both local and internet-based information gathering.
+IP-Sentinel is a Python console application that gathers comprehensive intelligence about IP addresses through multiple analysis modules. The system provides flexible output formats, persistent storage, and modular architecture for both local and internet-based information gathering.
 
 ## Glossary
 
-- **IP-ManA**: IP Management and Analysis application
+- **IP-Sentinel**: IP Management and Analysis application
 - **Classification_Module**: Module that categorizes IP addresses based on RFC-defined ranges
 - **Local_Info_Module**: Module that gathers information from the local network environment
 - **Internet_Info_Module**: Module that queries external services for IP intelligence

@@ -27,10 +27,10 @@ class TestProjectStructureCompliance:
         # Required directories according to Python framework standards
         required_dirs = [
             "src",
-            "src/ip_mana",
-            "src/ip_mana/modules",
-            "src/ip_mana/formatters",
-            "src/ip_mana/database",
+            "src/ip_sentinel",
+            "src/ip_sentinel/modules",
+            "src/ip_sentinel/formatters",
+            "src/ip_sentinel/database",
             "tests",
             "tests/unit",
             "tests/property",
@@ -58,13 +58,13 @@ class TestProjectStructureCompliance:
             "setup.py",
             "README.md",
             ".gitignore",
-            "src/ip_mana/__init__.py",
-            "src/ip_mana/cli.py",
-            "src/ip_mana/analyzer.py",
-            "src/ip_mana/config.py",
-            "src/ip_mana/modules/__init__.py",
-            "src/ip_mana/formatters/__init__.py",
-            "src/ip_mana/database/__init__.py",
+            "src/ip_sentinel/__init__.py",
+            "src/ip_sentinel/cli.py",
+            "src/ip_sentinel/analyzer.py",
+            "src/ip_sentinel/config.py",
+            "src/ip_sentinel/modules/__init__.py",
+            "src/ip_sentinel/formatters/__init__.py",
+            "src/ip_sentinel/database/__init__.py",
             "tests/__init__.py",
         ]
 
@@ -83,10 +83,10 @@ class TestProjectStructureCompliance:
 
         # All Python package directories should have __init__.py
         package_dirs = [
-            "src/ip_mana",
-            "src/ip_mana/modules",
-            "src/ip_mana/formatters",
-            "src/ip_mana/database",
+            "src/ip_sentinel",
+            "src/ip_sentinel/modules",
+            "src/ip_sentinel/formatters",
+            "src/ip_sentinel/database",
             "tests",
             "tests/unit",
             "tests/property",
@@ -157,7 +157,7 @@ class TestProjectStructureCompliance:
 
     @given(
         st.sampled_from(
-            ["src/ip_mana/modules", "src/ip_mana/formatters", "src/ip_mana/database"]
+            ["src/ip_sentinel/modules", "src/ip_sentinel/formatters", "src/ip_sentinel/database"]
         )
     )
     def test_module_directories_structure(self, module_dir):

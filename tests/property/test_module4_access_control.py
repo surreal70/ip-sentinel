@@ -5,7 +5,7 @@ Feature: ip-intelligence-analyzer, Property 8: Module 4 Access Control
 Validates: Requirements 5.2, 5.3, 9.7
 """
 
-from ip_mana.modules.application import ApplicationModule
+from ip_sentinel.modules.application import ApplicationModule
 import pytest
 from hypothesis import given, strategies as st
 from ipaddress import IPv4Address, IPv6Address

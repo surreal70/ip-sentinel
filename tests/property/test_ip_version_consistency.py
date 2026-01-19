@@ -10,9 +10,9 @@ from ipaddress import IPv4Address, IPv6Address
 from hypothesis import given, assume
 from hypothesis import strategies as st
 
-from src.ip_mana.ip_handler import IPAddressHandler, IPAddressValidationError
-from src.ip_mana.analyzer import IPAnalyzer
-from src.ip_mana.config import Config
+from src.ip_sentinel.ip_handler import IPAddressHandler, IPAddressValidationError
+from src.ip_sentinel.analyzer import IPAnalyzer
+from src.ip_sentinel.config import Config
 
 
 class TestIPVersionConsistency:

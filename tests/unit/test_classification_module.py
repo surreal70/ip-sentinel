@@ -10,8 +10,8 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from src.ip_mana.config import ConfigManager, ClassificationRule
-from src.ip_mana.modules.classification import ClassificationModule
+from src.ip_sentinel.config import ConfigManager, ClassificationRule
+from src.ip_sentinel.modules.classification import ClassificationModule
 
 
 class TestClassificationModule:

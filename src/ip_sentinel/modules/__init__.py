@@ -1,5 +1,5 @@
 """
-Analysis modules for IP Intelligence Analyzer.
+Analysis modules for IP-Sentinel.
 """
 
 from .application import ApplicationModule

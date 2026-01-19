@@ -1,5 +1,5 @@
 """
-Configuration management for IP Intelligence Analyzer.
+Configuration management for IP-Sentinel.
 """
 
 import json
@@ -42,6 +42,12 @@ class Config:
     # Module settings
     force_internet: bool = False
     enabled_modules: Dict[str, bool] = None
+
+    # Privilege settings
+    run_root: bool = False
+
+    # SSL certificate verification
+    verify_ssl: bool = True
 
     # Verbosity
     verbose: bool = False

@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from ipaddress import IPv4Address, IPv6Address
 from requests.exceptions import Timeout, RequestException
 
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     CheckMKSubmodule,
     ApplicationResult,
     AuthenticationConfig
@@ -52,7 +52,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertIsNotNone(submodule)
         self.assertIsNone(submodule.config)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ip_success_with_full_data(self, mock_request):
         """Test successful IP query with comprehensive monitoring data."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -181,7 +181,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
 
         self.assertIsInstance(result, ApplicationResult)
         self.assertTrue(result.success)
-        self.assertEqual(result.source, 'checkmk')
+        self.assertIn('CheckMK', result.source)
         self.assertIsNone(result.error_message)
 
         # Verify data structure
@@ -222,7 +222,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         # Verify alerts
         self.assertEqual(len(result.data['alerts']), 1)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ip_success_minimal_data(self, mock_request):
         """Test successful IP query with minimal data (no matching hosts)."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -250,11 +250,11 @@ class TestCheckMKSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertTrue(result.success)
-        self.assertEqual(result.source, 'checkmk')
+        self.assertIn('CheckMK', result.source)
         self.assertEqual(len(result.data['hosts']), 0)
         self.assertEqual(len(result.data['services']), 0)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ipv6_address(self, mock_request):
         """Test querying IPv6 address."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -287,7 +287,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
             str(test_ip)
         )
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_authentication_failure_401(self, mock_request):
         """Test handling of 401 authentication failure."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -301,10 +301,10 @@ class TestCheckMKSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertFalse(result.success)
-        self.assertEqual(result.source, 'checkmk')
+        self.assertIn('CheckMK', result.source)
         self.assertIn('Authentication failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_authentication_failure_403(self, mock_request):
         """Test handling of 403 permission denied."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -320,7 +320,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('Authentication failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_connection_timeout(self, mock_request):
         """Test handling of connection timeout."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -331,11 +331,11 @@ class TestCheckMKSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertFalse(result.success)
-        self.assertEqual(result.source, 'checkmk')
+        self.assertIn('CheckMK', result.source)
         self.assertIn('Connection failed', result.error_message)
         self.assertIn('timeout', result.error_message.lower())
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_connection_error(self, mock_request):
         """Test handling of general connection errors."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -348,7 +348,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('Connection failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_api_error_404(self, mock_request):
         """Test handling of 404 API errors."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -364,7 +364,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('API error', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_api_error_500(self, mock_request):
         """Test handling of 500 server errors."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -381,7 +381,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertIn('API error', result.error_message)
         self.assertIn('500', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_partial_failure_service_query(self, mock_request):
         """Test graceful handling when service query fails but host query succeeds."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -440,7 +440,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertEqual(len(result.data['hosts']), 1)
         self.assertEqual(len(result.data['services']), 0)  # Service query failed
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_no_config_error(self, mock_request):
         """Test error handling when no configuration is provided."""
         submodule = CheckMKSubmodule()  # No config
@@ -451,7 +451,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('No configuration', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_multiple_test_ips(self, mock_request):
         """Test querying all test IP addresses."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -465,9 +465,9 @@ class TestCheckMKSubmodule(unittest.TestCase):
         for test_ip in self.test_ips:
             result = submodule.query_ip(test_ip)
             self.assertTrue(result.success)
-            self.assertEqual(result.source, 'checkmk')
+            self.assertIn('CheckMK', result.source)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_multiple_hosts_same_ip(self, mock_request):
         """Test handling multiple hosts with the same IP address."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -518,7 +518,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertIn('host-01', host_ids)
         self.assertIn('host-02', host_ids)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_service_with_performance_data(self, mock_request):
         """Test extraction of performance data from services."""
         submodule = CheckMKSubmodule(self.auth_config)
@@ -575,7 +575,7 @@ class TestCheckMKSubmodule(unittest.TestCase):
         self.assertIn('read_ops', perf_data['metrics'])
         self.assertIn('write_ops', perf_data['metrics'])
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_unexpected_exception_handling(self, mock_request):
         """Test handling of unexpected exceptions."""
         submodule = CheckMKSubmodule(self.auth_config)

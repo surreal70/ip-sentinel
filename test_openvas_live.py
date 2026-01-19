@@ -14,7 +14,7 @@ Credentials:
 import sys
 import json
 from ipaddress import IPv4Address
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     OpenVASSubmodule,
     AuthenticationConfig,
     ApplicationModule,

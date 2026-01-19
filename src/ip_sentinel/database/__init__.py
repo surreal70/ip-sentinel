@@ -1,5 +1,5 @@
 """
-Database management for IP Intelligence Analyzer.
+Database management for IP-Sentinel.
 """
 
 from .manager import DatabaseManager

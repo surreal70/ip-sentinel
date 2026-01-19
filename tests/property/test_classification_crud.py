@@ -10,7 +10,7 @@ from pathlib import Path
 from hypothesis import given, strategies as st, assume
 from hypothesis.strategies import composite
 
-from src.ip_mana.config import ConfigManager, ClassificationRule
+from src.ip_sentinel.config import ConfigManager, ClassificationRule
 
 
 @composite

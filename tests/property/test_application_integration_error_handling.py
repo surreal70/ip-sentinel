@@ -5,7 +5,7 @@ Feature: ip-intelligence-analyzer, Property 20: Application Integration Error Ha
 Validates: Requirements 9.8
 """
 
-from ip_mana.modules.application import (
+from ip_sentinel.modules.application import (
     ApplicationModule,
     AuthenticationConfig,
     ConnectionError,

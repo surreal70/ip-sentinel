@@ -75,12 +75,24 @@ class InternetInfoResult:
 class InternetInfoModule:
     """Module for querying external services for public IP intelligence."""
 
-    def __init__(self):
-        """Initialize the internet info module."""
+    def __init__(self, verify_ssl: bool = True):
+        """
+        Initialize the internet info module.
+
+        Args:
+            verify_ssl: Whether to verify SSL certificates (default: True)
+        """
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'IP-ManA/1.0 (IP Intelligence Analyzer)'
+            'User-Agent': 'IP-Sentinel/1.0 (IP-Sentinel)'
         })
+        self.session.verify = verify_ssl
+
+        if not verify_ssl:
+            # Suppress SSL warnings when verification is disabled
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            logger.warning("SSL certificate verification disabled for InternetInfoModule")
 
         # DNS resolvers for reverse lookup
         self.dns_resolvers = [
@@ -465,7 +477,7 @@ class InternetInfoModule:
             response = self.session.get(
                 f"https://www.abuseipdb.com/check/{ip_str}",
                 timeout=10,
-                headers={'User-Agent': 'Mozilla/5.0 (compatible; IP-ManA/1.0)'}
+                headers={'User-Agent': 'Mozilla/5.0 (compatible; IP-Sentinel/1.0)'}
             )
 
             if response.status_code == 200:

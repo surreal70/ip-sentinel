@@ -10,7 +10,7 @@ from pathlib import Path
 from hypothesis import given, strategies as st
 from hypothesis.strategies import composite
 
-from src.ip_mana.database.manager import DatabaseManager
+from src.ip_sentinel.database.manager import DatabaseManager
 
 
 @composite

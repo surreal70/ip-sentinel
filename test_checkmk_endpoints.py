@@ -1,112 +1,119 @@
 #!/usr/bin/env python3
-"""
-Diagnostic script to find the correct CheckMK API endpoints.
-"""
+"""Test various CheckMK endpoints to find IP addresses."""
 
 import requests
+import json
 from requests.auth import HTTPBasicAuth
-import urllib3
+
+# Configuration
+BASE_URL = "https://checkmk.adminsend.local/AdminsEnd"
+USERNAME = "monitor"
+PASSWORD = "Monitor1234!"
+VERIFY_SSL = False
+TARGET_IP = "192.168.143.59"
 
 # Disable SSL warnings
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+if not VERIFY_SSL:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Credentials
-base_host = "https://checkmk.adminsend.local"
-username = "monitor"
-password = "Monitor1234!"
-
-# Common CheckMK site names
-site_names = ["", "cmk", "monitoring", "site", "default", "main"]
-
-# Common API paths
-api_paths = [
-    "/check_mk/api/1.0/version",
-    "/{site}/check_mk/api/1.0/version",
-    "/api/1.0/version",
-    "/{site}/api/1.0/version",
-    "/check_mk/webapi.py?action=get_all_hosts",
-    "/{site}/check_mk/webapi.py?action=get_all_hosts",
-]
-
-print("=" * 80)
-print("CheckMK API Endpoint Discovery")
-print("=" * 80)
-print(f"Host: {base_host}")
-print(f"Username: {username}")
-print(f"Password: {'*' * len(password)}")
-print()
-
-def test_endpoint(url):
-    """Test an endpoint and return status."""
+def test_endpoint(description, url, params=None, method='GET'):
+    """Test an endpoint and print results."""
+    print(f"\n{'='*60}")
+    print(description)
+    print(f"URL: {url}")
+    if params:
+        print(f"Params: {params}")
+    print('='*60)
+    
     try:
-        response = requests.get(
-            url,
-            auth=HTTPBasicAuth(username, password),
-            verify=False,
-            timeout=10
-        )
-        return response.status_code, response.text[:200]
-    except Exception as e:
-        return None, str(e)
-
-# Test without site name
-print("Testing endpoints without site name:")
-print("-" * 80)
-for path in api_paths:
-    if "{site}" not in path:
-        url = f"{base_host}{path}"
-        status, text = test_endpoint(url)
-        print(f"URL: {url}")
-        print(f"Status: {status}")
-        if status == 200:
-            print(f"Response: {text}")
-            print("✓ SUCCESS!")
-        print()
-
-# Test with different site names
-print("\nTesting endpoints with different site names:")
-print("-" * 80)
-for site in site_names:
-    if not site:
-        continue
-    print(f"\nSite: {site}")
-    for path in api_paths:
-        if "{site}" in path:
-            url = f"{base_host}{path.format(site=site)}"
-            status, text = test_endpoint(url)
-            print(f"  URL: {url}")
-            print(f"  Status: {status}")
-            if status == 200:
-                print(f"  Response: {text}")
-                print("  ✓ SUCCESS!")
-
-# Try to discover site by checking common URLs
-print("\n" + "=" * 80)
-print("Trying to discover CheckMK installation:")
-print("-" * 80)
-
-common_urls = [
-    "/",
-    "/cmk/",
-    "/monitoring/",
-    "/check_mk/",
-]
-
-for path in common_urls:
-    url = f"{base_host}{path}"
-    try:
-        response = requests.get(url, verify=False, timeout=10, allow_redirects=True)
-        print(f"URL: {url}")
+        if method == 'GET':
+            response = requests.get(
+                url,
+                auth=HTTPBasicAuth(USERNAME, PASSWORD),
+                headers={'Accept': 'application/json'},
+                params=params,
+                verify=VERIFY_SSL,
+                timeout=30
+            )
+        else:
+            response = requests.post(
+                url,
+                auth=HTTPBasicAuth(USERNAME, PASSWORD),
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+                json=params,
+                verify=VERIFY_SSL,
+                timeout=30
+            )
+        
         print(f"Status: {response.status_code}")
-        print(f"Final URL: {response.url}")
-        if "check_mk" in response.text.lower() or "checkmk" in response.text.lower():
-            print("✓ CheckMK installation detected!")
-        print()
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(json.dumps(data, indent=2)[:2000])
+            return data
+        else:
+            print(f"Error: {response.text[:500]}")
+            return None
     except Exception as e:
-        print(f"URL: {url}")
-        print(f"Error: {e}")
-        print()
+        print(f"Exception: {e}")
+        return None
 
-print("=" * 80)
-print("Discovery complete")
-print("=" * 80)
+# Test 1: Get first host with show action
+print("\n" + "="*60)
+print("TEST 1: Get host with show action")
+print("="*60)
+data = test_endpoint(
+    "Get first host details with show action",
+    f"{BASE_URL}/check_mk/api/1.0/objects/host/wrk-cob-vm-0800/actions/show/invoke",
+    method='POST'
+)
+
+# Test 2: Try to get effective attributes
+print("\n" + "="*60)
+print("TEST 2: Try effective_attributes parameter")
+print("="*60)
+data = test_endpoint(
+    "Get host with effective_attributes",
+    f"{BASE_URL}/check_mk/api/1.0/objects/host/wrk-cob-vm-0800",
+    params={'effective_attributes': 'true'}
+)
+
+# Test 3: Try the show_host endpoint
+print("\n" + "="*60)
+print("TEST 3: Try show_host endpoint")
+print("="*60)
+data = test_endpoint(
+    "Show host endpoint",
+    f"{BASE_URL}/check_mk/api/1.0/objects/host/wrk-cob-vm-0800/actions/show_host/invoke",
+    method='POST'
+)
+
+# Test 4: Get all hosts and check if we can find one with our IP in the hostname
+print("\n" + "="*60)
+print("TEST 4: Search for hostname containing IP pattern")
+print("="*60)
+response = requests.get(
+    f"{BASE_URL}/check_mk/api/1.0/domain-types/host/collections/all",
+    auth=HTTPBasicAuth(USERNAME, PASSWORD),
+    headers={'Accept': 'application/json'},
+    verify=VERIFY_SSL,
+    timeout=30
+)
+
+if response.status_code == 200:
+    hosts = response.json().get('value', [])
+    print(f"Total hosts: {len(hosts)}")
+    
+    # Look for hosts with IP-like patterns in name
+    ip_pattern = TARGET_IP.replace('.', '-')
+    print(f"\nSearching for hosts with pattern: {ip_pattern}")
+    
+    for host in hosts:
+        host_id = host.get('id', '')
+        if TARGET_IP.replace('.', '-') in host_id or TARGET_IP.replace('.', '_') in host_id:
+            print(f"  Found potential match: {host_id}")
+
+print("\n" + "="*60)
+print("Testing complete")
+print("="*60)

@@ -20,7 +20,7 @@ import tempfile
 import os
 from requests.exceptions import Timeout
 
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     ApplicationModule,
     ApplicationResult,
     AuthenticationConfig,
@@ -123,7 +123,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         self.assertIn('checkmk', enabled)
         self.assertIn('openvas', enabled)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_all_enabled_success(self, mock_request):
         """Test querying all enabled submodules successfully."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -180,7 +180,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
             self.assertTrue(result.success, f"{submodule_name} should succeed")
             self.assertEqual(result.source, submodule_name)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_specific_submodules(self, mock_request):
         """Test querying only specific submodules."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -201,7 +201,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         self.assertIn('checkmk', results)
         self.assertNotIn('openvas', results)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_partial_failure_isolation(self, mock_request):
         """Test that failure in one submodule doesn't affect others (error isolation)."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -261,7 +261,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         self.assertTrue(results['openvas'].success)
         self.assertEqual(len(results['openvas'].data.get('targets', [])), 1)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_multiple_failures_graceful_degradation(self, mock_request):
         """Test graceful degradation when multiple submodules fail."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -307,7 +307,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         # OpenVAS should succeed
         self.assertTrue(results['openvas'].success)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_standardized_result_formatting(self, mock_request):
         """Test that all submodules return standardized ApplicationResult format."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -334,7 +334,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
                 self.assertIsNotNone(result.error_message)
                 self.assertIsInstance(result.error_message, str)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_data_correlation_across_submodules(self, mock_request):
         """Test that data from different submodules can be correlated by IP address."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -481,7 +481,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
             # Clean up temporary file
             os.unlink(temp_file)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_authentication_sharing_across_submodules(self, mock_request):
         """Test that authentication is properly managed across multiple submodules."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -511,7 +511,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
             openvas.session.headers['Authorization'],
             'Token openvas_test_token')
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_concurrent_submodule_execution(self, mock_request):
         """Test that multiple submodules can execute queries simultaneously without interference."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -546,7 +546,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         # Verify all results are present
         self.assertEqual(len(results), 3)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_ipv6_support_across_submodules(self, mock_request):
         """Test that all submodules properly handle IPv6 addresses."""
         app_module = ApplicationModule(configurations=self.configurations)
@@ -577,7 +577,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         self.assertIn('Unknown submodule', str(context.exception))
         self.assertIn('unknown_submodule', str(context.exception))
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_empty_configuration_handling(self, mock_request):
         """Test handling of empty configuration (no submodules configured)."""
         app_module = ApplicationModule(configurations={})
@@ -588,7 +588,7 @@ class TestApplicationModuleIntegration(unittest.TestCase):
         # Should return empty results without crashing
         self.assertEqual(len(results), 0)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_submodule_caching(self, mock_request):
         """Test that submodules are cached and reused."""
         app_module = ApplicationModule(configurations=self.configurations)

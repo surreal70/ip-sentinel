@@ -21,12 +21,12 @@ from unittest.mock import Mock, patch
 from ipaddress import IPv4Address, IPv6Address
 from datetime import datetime
 
-from src.ip_mana.analyzer import IPAnalyzer, AnalysisResult, setup_logging
-from src.ip_mana.config import Config, ConfigManager, ClassificationRule
-from src.ip_mana.database.manager import DatabaseManager
-from src.ip_mana.formatters.human import HumanFormatter
-from src.ip_mana.formatters.json import JSONFormatter
-from src.ip_mana.formatters.html import HTMLFormatter
+from src.ip_sentinel.analyzer import IPAnalyzer, AnalysisResult, setup_logging
+from src.ip_sentinel.config import Config, ConfigManager, ClassificationRule
+from src.ip_sentinel.database.manager import DatabaseManager
+from src.ip_sentinel.formatters.human import HumanFormatter
+from src.ip_sentinel.formatters.json import JSONFormatter
+from src.ip_sentinel.formatters.html import HTMLFormatter
 
 
 class TestEndToEndAnalysis(unittest.TestCase):
@@ -376,7 +376,7 @@ class TestEndToEndAnalysis(unittest.TestCase):
             # Full-err mode should show errors
             self.assertIsInstance(output, str)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_application_module_integration(self, mock_request):
         """Test integration with application modules."""
         # Enable application modules

@@ -8,7 +8,7 @@ Tests the NetBox submodule with real credentials against the actual NetBox insta
 import sys
 import json
 from ipaddress import IPv4Address
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     NetBoxSubmodule,
     ApplicationModule,
     CredentialManager,

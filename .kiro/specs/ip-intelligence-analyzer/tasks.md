@@ -384,7 +384,7 @@ This implementation plan follows the Python development framework standards and 
   - Run full test suite to verify all 236 tests pass
   - _Requirements: Test reliability and correctness validation_
 
-- [ ] 25. User experience and functionality enhancements
+- [x] 25. User experience and functionality enhancements
   - Add explicit "human" output format option and make it default
   - Skip root-privileged tests by default unless --run-root flag is specified
   - Improve human readability of classification and local network information
@@ -392,7 +392,7 @@ This implementation plan follows the Python development framework standards and 
   - Add NAT detection test for RFC 1918 addresses
   - _Requirements: Usability and feature enhancements_
 
-- [ ] 25.1 Add explicit human output format option
+- [x] 25.1 Add explicit human output format option
   - Add --human command-line flag to explicitly specify human-readable output
   - Make human-readable format the default when no format flag is specified
   - Update help documentation to reflect human as default format
@@ -400,7 +400,7 @@ This implementation plan follows the Python development framework standards and 
   - Update CLI argument parsing to handle new --human flag
   - _Requirements: Output format management and usability_
 
-- [ ] 25.2 Implement root privilege detection and --run-root flag
+- [x] 25.2 Implement root privilege detection and --run-root flag
   - Add --run-root command-line flag to enable tests requiring root privileges
   - Detect when tests require root privileges (nmap OS detection, certain port scans)
   - Skip root-required tests by default and log informative messages
@@ -409,7 +409,7 @@ This implementation plan follows the Python development framework standards and 
   - Update help documentation to explain --run-root flag usage
   - _Requirements: Security and user control_
 
-- [ ] 25.3 Improve human readability of classification and local network results
+- [x] 25.3 Improve human readability of classification and local network results
   - Refactor classification output formatting for better readability
   - Add clear section headers and visual separators
   - Format IP ranges and network information in more intuitive way
@@ -418,7 +418,7 @@ This implementation plan follows the Python development framework standards and 
   - Ensure consistent formatting across human and HTML outputs
   - _Requirements: Output format validity and user experience_
 
-- [ ] 25.4 Enhance traceroute output with tree-like visualization
+- [x] 25.4 Enhance traceroute output with tree-like visualization
   - Redesign traceroute output to display as hierarchical tree structure
   - Show hop number, IP address, hostname, and response time in tree format
   - Implement tree visualization for human-readable output
@@ -427,7 +427,7 @@ This implementation plan follows the Python development framework standards and 
   - Add visual indicators for successful/failed hops
   - _Requirements: Output format validity and visualization_
 
-- [ ] 25.5 Add NAT detection test for RFC 1918 addresses
+- [x] 25.5 Add NAT detection test for RFC 1918 addresses
   - Implement NAT detection logic for private IP addresses (RFC 1918)
   - Query external service to determine public IP address
   - Compare private IP with detected public IP to identify NAT
@@ -438,7 +438,7 @@ This implementation plan follows the Python development framework standards and 
   - Document NAT detection methodology and limitations
   - _Requirements: Local information gathering completeness_
 
-- [ ] 25.6 Integration testing for UX enhancements
+- [x] 25.6 Integration testing for UX enhancements
   - Test --human flag with all output modes
   - Test --run-root flag behavior with and without root privileges
   - Verify improved readability across different terminal types
@@ -447,7 +447,7 @@ This implementation plan follows the Python development framework standards and 
   - Ensure all enhancements work together without conflicts
   - _Requirements: Integration and end-to-end validation_
 
-- [ ] 25.7 Add --no-cert-check option to ignore SSL certificate errors
+- [x] 25.7 Add --no-cert-check option to ignore SSL certificate errors
   - Add --no-cert-check command-line flag to disable SSL certificate verification
   - Update Application Module submodules to respect the no-cert-check flag
   - Pass verify_ssl=False to requests when --no-cert-check is enabled
@@ -457,6 +457,90 @@ This implementation plan follows the Python development framework standards and 
   - Ensure flag works with all modules that make HTTPS requests (NetBox, CheckMK, OpenVAS, Internet Info)
   - Test with self-signed certificates and expired certificates
   - _Requirements: Security configuration and error handling_
+
+- [x] 26. HTML output format improvements
+  - Improve HTML output formatting for better readability and compactness
+  - Optimize nmap results display in HTML format
+  - Enhance certificate presentation with deduplication
+  - Streamline Application Module output in HTML
+  - _Requirements: Output format validity and user experience_
+
+- [x] 26.1 Compact nmap results in HTML output with table format
+  - Display nmap open ports in table format (one line per port)
+  - Create table with columns: Port, Protocol, State, Service, Version
+  - Display nmap services in table format (one line per service)
+  - Remove verbose nmap output and show only essential information
+  - Ensure table formatting is responsive and readable
+  - _Requirements: 2.3, 2.5, 7.8, 7.9, 7.10_
+
+- [x] 26.2 Remove port difference section and add certificate deduplication in HTML
+  - Remove "Port Difference" section from HTML output
+  - Implement certificate deduplication similar to human output format
+  - Display certificate information once with list of ports using same certificate
+  - Show only relevant information for each port (no redundant certificate details)
+  - Format certificate information in clean, readable table structure
+  - _Requirements: 2.3, 2.5, 7.11, 7.12, 7.13_
+
+- [x] 26.3 Compact NetBox output in HTML format
+  - Streamline NetBox information display similar to human output formatting
+  - Use compact table format for NetBox data (IP details, device info, VLAN, VRF)
+  - Remove verbose JSON-like output and show only essential fields
+  - Ensure consistent formatting with other HTML sections
+  - _Requirements: 2.3, 2.5, 9.1, 9.2_
+
+- [x] 26.4 Compact CheckMK output in HTML format
+  - Streamline CheckMK information display similar to human output formatting
+  - Use compact table format for CheckMK data (host info, services, alerts)
+  - Remove verbose output and show only essential monitoring information
+  - Ensure consistent formatting with other HTML sections
+  - _Requirements: 2.3, 2.5, 9.3_
+
+- [x] 26.5 Add links to NetBox and CheckMK objects in HTML output
+  - For NetBox HTML output: add clickable links to NetBox objects (prefixes, devices, interfaces)
+  - For CheckMK HTML output: add clickable links to CheckMK objects (hosts, services)
+  - NetBox module: collect URL information for objects related to the IP address
+  - Links should open in new tab/window for better user experience
+  - Ensure links are properly formatted and functional
+  - _Requirements: 2.3, 2.5, 9.1, 9.2, 9.3_
+
+- [x] 27. Rename application from "ip-sentinel" to "ip-sentinel"
+  - Rename all references from "ip-sentinel" to "ip-sentinel" throughout the codebase
+  - Update package name, module names, and directory structure
+  - Update all documentation and configuration files
+  - Ensure backward compatibility or provide migration guide
+  - _Requirements: Application architecture and branding_
+
+- [x] 27.1 Rename Python package and module directories
+  - Rename src/ip_sentinel directory to src/ip_sentinel
+  - Update __init__.py files with new package name
+  - Update all internal imports to use ip_sentinel instead of ip_sentinel
+  - Update setup.py and pyproject.toml with new package name
+  - Update entry points and console scripts to use ip-sentinel command
+  - _Requirements: 1.1, 1.2_
+
+- [x] 27.2 Update documentation and configuration files
+  - Update README.md with new application name "IP-Sentinel"
+  - Update all documentation files in docs/ directory
+  - Update configuration file examples (app_credentials.example.json)
+  - Update help text and CLI documentation with new name
+  - Update version information and about text
+  - Search for any remaining "ip-sentinel" or "IP-Sentinel" references and replace
+  - _Requirements: 10.2, 10.6_
+
+- [x] 27.3 Update tests and test configuration
+  - Update all test files to import from ip_sentinel instead of ip_sentinel
+  - Update test documentation and comments
+  - Verify all tests pass after renaming
+  - Update any test fixtures or mock data with new name
+  - _Requirements: Testing and validation_
+
+- [x] 28. Final checkpoint for HTML improvements and renaming
+  - Ensure all HTML output improvements are working correctly
+  - Verify application renaming is complete and consistent
+  - Run full test suite to confirm no regressions
+  - Test HTML output with various IP addresses and scenarios
+  - Validate that ip-sentinel command works correctly
+  - Ask the user if questions arise.
 
 ## Notes
 

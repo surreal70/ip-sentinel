@@ -9,7 +9,7 @@ from hypothesis import given, strategies as st, settings
 from ipaddress import IPv4Address, IPv6Address
 from unittest.mock import patch, MagicMock
 
-from src.ip_mana.modules.local_info import LocalInfoModule, MACAddress
+from src.ip_sentinel.modules.local_info import LocalInfoModule, MACAddress
 
 
 # Strategy for generating valid IP addresses
@@ -55,8 +55,8 @@ class TestMACAddressProcessing:
 
         **Validates: Requirements 7.4, 7.5**
         """
-        with patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess, \
-                patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces:
+        with patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess, \
+                patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces:
 
             # Setup mocks to return the test MAC address
             self._setup_mac_mocks(mock_subprocess, mock_netifaces, ip, mac_address)
@@ -110,7 +110,7 @@ class TestMACAddressProcessing:
         The system should correctly identify when a MAC address belongs to
         a gateway/router based on network topology information.
         """
-        with patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces:
+        with patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces:
 
             # Test case 1: IP is the default gateway
             mock_netifaces.gateways.return_value = {
@@ -149,7 +149,7 @@ class TestMACAddressProcessing:
         ]
 
         for mac_variant in mac_variants:
-            with patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess:
+            with patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess:
                 # Mock ARP output with the variant
                 mock_result = MagicMock()
                 mock_result.returncode = 0
@@ -195,8 +195,8 @@ class TestMACAddressErrorHandling:
         The system should handle ARP lookup failures, permission issues,
         and missing network tools without crashing.
         """
-        with patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess, \
-                patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces:
+        with patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess, \
+                patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces:
 
             # Test case 1: ARP command fails
             mock_subprocess.run.side_effect = Exception("ARP command failed")

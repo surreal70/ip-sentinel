@@ -1,5 +1,5 @@
 """
-Main application controller for IP Intelligence Analyzer.
+Main application controller for IP-Sentinel.
 
 This module provides comprehensive integration of all analysis modules with:
 - Graceful error handling and degradation
@@ -96,7 +96,7 @@ class IPAnalyzer:
         self.credential_file = credential_file
         self.errors: List[str] = []
 
-        logger.info("Initializing IP Intelligence Analyzer")
+        logger.info("Initializing IP-Sentinel")
 
         # Initialize modules with error handling
         try:
@@ -108,7 +108,10 @@ class IPAnalyzer:
             self.errors.append(f"Classification module initialization failed: {e}")
 
         try:
-            self.local_info_module = LocalInfoModule()
+            self.local_info_module = LocalInfoModule(
+                run_root=self.config.run_root,
+                verify_ssl=self.config.verify_ssl
+            )
             logger.debug("Local info module initialized")
         except Exception as e:
             logger.error(f"Failed to initialize local info module: {e}")
@@ -116,7 +119,7 @@ class IPAnalyzer:
             self.errors.append(f"Local info module initialization failed: {e}")
 
         try:
-            self.internet_info_module = InternetInfoModule()
+            self.internet_info_module = InternetInfoModule(verify_ssl=self.config.verify_ssl)
             logger.debug("Internet info module initialized")
         except Exception as e:
             logger.error(f"Failed to initialize internet info module: {e}")
@@ -124,7 +127,10 @@ class IPAnalyzer:
             self.errors.append(f"Internet info module initialization failed: {e}")
 
         try:
-            self.application_module = ApplicationModule(credential_file)
+            self.application_module = ApplicationModule(
+                credential_file,
+                verify_ssl=self.config.verify_ssl
+            )
             logger.debug("Application module initialized")
         except Exception as e:
             logger.error(f"Failed to initialize application module: {e}")
@@ -378,7 +384,8 @@ class IPAnalyzer:
                 }
                 for tr in local_result.traceroute_results
             ],
-            'reverse_dns': local_result.reverse_dns
+            'reverse_dns': local_result.reverse_dns,
+            'nat_detection': local_result.nat_detection
         }
 
     def validate_module_availability(self, module_names: List[str]) -> Dict[str, bool]:

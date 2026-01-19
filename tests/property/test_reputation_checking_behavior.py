@@ -10,7 +10,7 @@ from ipaddress import IPv4Address, IPv6Address
 from unittest.mock import Mock, patch
 import socket
 
-from src.ip_mana.modules.internet_info import InternetInfoModule, BlocklistResult
+from src.ip_sentinel.modules.internet_info import InternetInfoModule, BlocklistResult
 
 
 # Strategy for generating valid IPv4 addresses

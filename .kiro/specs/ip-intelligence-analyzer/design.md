@@ -2,7 +2,7 @@
 
 ## Overview
 
-The IP Intelligence Analyzer (IP-ManA) is a modular Python console application that provides comprehensive intelligence gathering for IP addresses. The system employs a plugin-based architecture with four main analysis modules, flexible output formatting, and persistent data storage. The design emphasizes modularity, extensibility, and robust error handling while supporting both IPv4 and IPv6 addresses.
+The IP Intelligence Analyzer (IP-Sentinel) is a modular Python console application that provides comprehensive intelligence gathering for IP addresses. The system employs a plugin-based architecture with four main analysis modules, flexible output formatting, and persistent data storage. The design emphasizes modularity, extensibility, and robust error handling while supporting both IPv4 and IPv6 addresses.
 
 ## Architecture
 
@@ -406,7 +406,7 @@ This project will follow the standardized Python development framework requireme
 ```
 ip-intelligence-analyzer/
 ├── src/                    # Source code
-│   ├── ip_mana/           # Main application package
+│   ├── ip_sentinel/           # Main application package
 │   │   ├── __init__.py
 │   │   ├── cli.py         # Command-line interface
 │   │   ├── analyzer.py    # Main application controller

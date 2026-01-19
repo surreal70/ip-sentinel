@@ -1,5 +1,5 @@
 """
-Output formatters for IP Intelligence Analyzer.
+Output formatters for IP-Sentinel.
 """
 
 from .base import OutputFormatter, VerbosityMode

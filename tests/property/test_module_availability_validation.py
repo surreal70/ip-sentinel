@@ -10,8 +10,8 @@ from pathlib import Path
 import tempfile
 import json
 
-from src.ip_mana.analyzer import IPAnalyzer
-from src.ip_mana.config import Config
+from src.ip_sentinel.analyzer import IPAnalyzer
+from src.ip_sentinel.config import Config
 
 
 # Strategy for generating module names

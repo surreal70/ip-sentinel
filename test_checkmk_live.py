@@ -8,7 +8,7 @@ Tests the CheckMK submodule with real credentials against the actual CheckMK ins
 import sys
 import json
 from ipaddress import IPv4Address
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     CheckMKSubmodule,
     ApplicationModule,
     CredentialManager,

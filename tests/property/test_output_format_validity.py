@@ -12,8 +12,8 @@ from ipaddress import IPv4Address, IPv6Address
 import hypothesis.strategies as st
 from hypothesis import given
 
-from src.ip_mana.analyzer import AnalysisResult
-from src.ip_mana.formatters import HumanFormatter, JSONFormatter, HTMLFormatter
+from src.ip_sentinel.analyzer import AnalysisResult
+from src.ip_sentinel.formatters import HumanFormatter, JSONFormatter, HTMLFormatter
 
 
 # Strategies for generating test data

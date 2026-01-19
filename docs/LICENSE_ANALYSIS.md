@@ -233,5 +233,5 @@ This software uses the following open source packages:
 ---
 
 **Analysis Date**: January 18, 2026  
-**Analyzer**: IP-ManA Development Team  
+**Analyzer**: IP-Sentinel Development Team  
 **Status**: ✅ MIT License Recommended and Compatible

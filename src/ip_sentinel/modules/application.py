@@ -280,6 +280,8 @@ class ApplicationSubmodule(ABC):
         Returns:
             Formatted source string (e.g., "netbox.example.com:443" or "checkmk.example.com:443/site:monitoring")
         """
+        if not self.config:
+            return "unconfigured"
         base_url = self.config.base_url
         # Extract hostname and port from URL
         from urllib.parse import urlparse
@@ -377,12 +379,17 @@ class NetBoxSubmodule(ApplicationSubmodule):
         - Prefix and subnet information
         - Device and interface associations
         - VLAN and VRF information
+        - Virtual machines and clusters
+        - Sites and locations
+        - Tenants and contacts
+        - Custom fields and tags
+        - IP address history and comments
 
         Args:
             ip: IPAddress object to query
 
         Returns:
-            ApplicationResult with comprehensive IPAM data
+            ApplicationResult with comprehensive IPAM data including URLs
         """
         try:
             result_data = {
@@ -392,19 +399,113 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 'interfaces': [],
                 'vlans': [],
                 'vrfs': [],
-                'source': 'NetBox IPAM'
+                'virtual_machines': [],
+                'clusters': [],
+                'sites': [],
+                'tenants': [],
+                'contacts': [],
+                'ip_ranges': [],
+                'aggregates': [],
+                'services': [],
+                'source': 'NetBox IPAM',
+                'base_url': self.config.base_url if self.config else None  # Add base URL for link generation
             }
 
-            # Query IP address details
+            # Query IP address details with expanded fields
             logger.info(f"Querying NetBox for IP address: {ip}")
             ip_data = self._make_request(f"api/ipam/ip-addresses/?address={ip}")
             ip_results = ip_data.get('results', [])
+            
+            # Add URL to each IP address object and extract additional metadata
+            for ip_obj in ip_results:
+                if 'id' in ip_obj:
+                    ip_obj['web_url'] = f"{self.config.base_url}/ipam/ip-addresses/{ip_obj['id']}/"
+                
+                # Extract tenant information
+                tenant = ip_obj.get('tenant')
+                if tenant and tenant.get('id') and tenant['id'] not in [t.get('id') for t in result_data['tenants']]:
+                    try:
+                        tenant_id = tenant['id']
+                        logger.info(f"Querying NetBox for tenant: {tenant_id}")
+                        tenant_data = self._make_request(f"api/tenancy/tenants/{tenant_id}/")
+                        tenant_data['web_url'] = f"{self.config.base_url}/tenancy/tenants/{tenant_id}/"
+                        result_data['tenants'].append(tenant_data)
+                        
+                        # Get tenant contacts if available
+                        if tenant_data.get('contacts'):
+                            for contact_ref in tenant_data.get('contacts', []):
+                                if isinstance(contact_ref, dict) and contact_ref.get('id'):
+                                    contact_id = contact_ref['id']
+                                    if contact_id not in [c.get('id') for c in result_data['contacts']]:
+                                        try:
+                                            contact_data = self._make_request(f"api/tenancy/contacts/{contact_id}/")
+                                            result_data['contacts'].append(contact_data)
+                                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                                            logger.warning(f"Failed to query contact {contact_id}: {e}")
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query tenant details: {e}")
+            
             result_data['ip_addresses'] = ip_results
 
             # Query prefix information (subnets containing this IP)
             logger.info(f"Querying NetBox for prefixes containing: {ip}")
             prefix_data = self._make_request(f"api/ipam/prefixes/?contains={ip}")
-            result_data['prefixes'] = prefix_data.get('results', [])
+            prefixes = prefix_data.get('results', [])
+            
+            # Add URL to each prefix object and extract site information
+            for prefix in prefixes:
+                if 'id' in prefix:
+                    prefix['web_url'] = f"{self.config.base_url}/ipam/prefixes/{prefix['id']}/"
+                
+                # Extract site information (can be in 'site' or 'scope' field)
+                site = prefix.get('site') or prefix.get('scope')
+                if site and site.get('id') and site['id'] not in [s.get('id') for s in result_data['sites']]:
+                    try:
+                        site_id = site['id']
+                        logger.info(f"Querying NetBox for site from prefix: {site_id}")
+                        site_data = self._make_request(f"api/dcim/sites/{site_id}/")
+                        site_data['web_url'] = f"{self.config.base_url}/dcim/sites/{site_id}/"
+                        result_data['sites'].append(site_data)
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query site details: {e}")
+                
+                # Extract tenant information from prefix
+                tenant = prefix.get('tenant')
+                if tenant and tenant.get('id') and tenant['id'] not in [t.get('id') for t in result_data['tenants']]:
+                    try:
+                        tenant_id = tenant['id']
+                        logger.info(f"Querying NetBox for tenant from prefix: {tenant_id}")
+                        tenant_data = self._make_request(f"api/tenancy/tenants/{tenant_id}/")
+                        tenant_data['web_url'] = f"{self.config.base_url}/tenancy/tenants/{tenant_id}/"
+                        result_data['tenants'].append(tenant_data)
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query tenant details: {e}")
+            
+            result_data['prefixes'] = prefixes
+            
+            # Query IP ranges that might contain this IP
+            logger.info(f"Querying NetBox for IP ranges containing: {ip}")
+            try:
+                ranges_data = self._make_request(f"api/ipam/ip-ranges/?contains={ip}")
+                ip_ranges = ranges_data.get('results', [])
+                for ip_range in ip_ranges:
+                    if 'id' in ip_range:
+                        ip_range['web_url'] = f"{self.config.base_url}/ipam/ip-ranges/{ip_range['id']}/"
+                result_data['ip_ranges'] = ip_ranges
+            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                logger.warning(f"Failed to query IP ranges: {e}")
+            
+            # Query aggregates (supernets)
+            logger.info(f"Querying NetBox for aggregates containing: {ip}")
+            try:
+                aggregates_data = self._make_request(f"api/ipam/aggregates/?contains={ip}")
+                aggregates = aggregates_data.get('results', [])
+                for aggregate in aggregates:
+                    if 'id' in aggregate:
+                        aggregate['web_url'] = f"{self.config.base_url}/ipam/aggregates/{aggregate['id']}/"
+                result_data['aggregates'] = aggregates
+            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                logger.warning(f"Failed to query aggregates: {e}")
 
             # If we found IP address records, get associated device and interface
             # information
@@ -414,26 +515,77 @@ class NetBoxSubmodule(ApplicationSubmodule):
                     assigned_object = ip_record.get('assigned_object')
                     if assigned_object:
                         assigned_object_id = assigned_object.get('id')
-                        assigned_object_type = assigned_object.get('object_type', '')
+                        # Get object_type from the IP record, not from assigned_object
+                        assigned_object_type = ip_record.get('assigned_object_type', '')
 
                         # Query interface details if assigned to an interface
                         if 'interface' in assigned_object_type.lower() and assigned_object_id:
                             try:
                                 logger.info(
                                     f"Querying NetBox for interface: {assigned_object_id}")
-                                interface_data = self._make_request(
-                                    f"api/dcim/interfaces/{assigned_object_id}/")
+                                
+                                # Determine if it's a device interface or VM interface
+                                if 'virtualization' in assigned_object_type:
+                                    interface_data = self._make_request(
+                                        f"api/virtualization/interfaces/{assigned_object_id}/")
+                                    if 'id' in interface_data:
+                                        interface_data['web_url'] = f"{self.config.base_url}/virtualization/interfaces/{interface_data['id']}/"
+                                    
+                                    # Get virtual machine information
+                                    vm_info = interface_data.get('virtual_machine')
+                                    if vm_info and vm_info.get('id'):
+                                        vm_id = vm_info['id']
+                                        logger.info(f"Querying NetBox for virtual machine: {vm_id}")
+                                        vm_data = self._make_request(f"api/virtualization/virtual-machines/{vm_id}/")
+                                        if 'id' in vm_data:
+                                            vm_data['web_url'] = f"{self.config.base_url}/virtualization/virtual-machines/{vm_data['id']}/"
+                                        result_data['virtual_machines'].append(vm_data)
+                                        
+                                        # Get cluster information from VM
+                                        cluster_info = vm_data.get('cluster')
+                                        if cluster_info and cluster_info.get('id'):
+                                            cluster_id = cluster_info['id']
+                                            if cluster_id not in [c.get('id') for c in result_data['clusters']]:
+                                                logger.info(f"Querying NetBox for cluster: {cluster_id}")
+                                                cluster_data = self._make_request(f"api/virtualization/clusters/{cluster_id}/")
+                                                if 'id' in cluster_data:
+                                                    cluster_data['web_url'] = f"{self.config.base_url}/virtualization/clusters/{cluster_data['id']}/"
+                                                result_data['clusters'].append(cluster_data)
+                                        
+                                        # Get site from VM
+                                        site = vm_data.get('site')
+                                        if site and site.get('id') and site['id'] not in [s.get('id') for s in result_data['sites']]:
+                                            site_id = site['id']
+                                            logger.info(f"Querying NetBox for site from VM: {site_id}")
+                                            site_data = self._make_request(f"api/dcim/sites/{site_id}/")
+                                            site_data['web_url'] = f"{self.config.base_url}/dcim/sites/{site_id}/"
+                                            result_data['sites'].append(site_data)
+                                else:
+                                    interface_data = self._make_request(
+                                        f"api/dcim/interfaces/{assigned_object_id}/")
+                                    if 'id' in interface_data:
+                                        interface_data['web_url'] = f"{self.config.base_url}/dcim/interfaces/{interface_data['id']}/"
+                                    
+                                    # Get device information from interface
+                                    device_info = interface_data.get('device')
+                                    if device_info and device_info.get('id'):
+                                        device_id = device_info['id']
+                                        logger.info(f"Querying NetBox for device: {device_id}")
+                                        device_data = self._make_request(f"api/dcim/devices/{device_id}/")
+                                        if 'id' in device_data:
+                                            device_data['web_url'] = f"{self.config.base_url}/dcim/devices/{device_data['id']}/"
+                                        result_data['devices'].append(device_data)
+                                        
+                                        # Get site from device
+                                        site = device_data.get('site')
+                                        if site and site.get('id') and site['id'] not in [s.get('id') for s in result_data['sites']]:
+                                            site_id = site['id']
+                                            logger.info(f"Querying NetBox for site from device: {site_id}")
+                                            site_data = self._make_request(f"api/dcim/sites/{site_id}/")
+                                            site_data['web_url'] = f"{self.config.base_url}/dcim/sites/{site_id}/"
+                                            result_data['sites'].append(site_data)
+                                
                                 result_data['interfaces'].append(interface_data)
-
-                                # Get device information from interface
-                                device_info = interface_data.get('device')
-                                if device_info and device_info.get('id'):
-                                    device_id = device_info['id']
-                                    logger.info(
-                                        f"Querying NetBox for device: {device_id}")
-                                    device_data = self._make_request(
-                                        f"api/dcim/devices/{device_id}/")
-                                    result_data['devices'].append(device_data)
                             except (AuthenticationError, ConnectionError, ApplicationError) as e:
                                 logger.warning(
                                     f"Failed to query interface/device details: {e}")
@@ -442,27 +594,57 @@ class NetBoxSubmodule(ApplicationSubmodule):
                     vrf = ip_record.get('vrf')
                     if vrf and vrf.get('id'):
                         vrf_id = vrf['id']
-                        try:
-                            logger.info(f"Querying NetBox for VRF: {vrf_id}")
-                            vrf_data = self._make_request(f"api/ipam/vrfs/{vrf_id}/")
-                            result_data['vrfs'].append(vrf_data)
-                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
-                            logger.warning(f"Failed to query VRF details: {e}")
+                        if vrf_id not in [v.get('id') for v in result_data['vrfs']]:
+                            try:
+                                logger.info(f"Querying NetBox for VRF: {vrf_id}")
+                                vrf_data = self._make_request(f"api/ipam/vrfs/{vrf_id}/")
+                                vrf_data['web_url'] = f"{self.config.base_url}/ipam/vrfs/{vrf_id}/"
+                                result_data['vrfs'].append(vrf_data)
+                            except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                                logger.warning(f"Failed to query VRF details: {e}")
 
             # Get VLAN information from prefixes
             for prefix in result_data['prefixes']:
                 vlan = prefix.get('vlan')
                 if vlan and vlan.get('id'):
                     vlan_id = vlan['id']
-                    try:
-                        logger.info(f"Querying NetBox for VLAN: {vlan_id}")
-                        vlan_data = self._make_request(f"api/ipam/vlans/{vlan_id}/")
-                        # Avoid duplicates
-                        if not any(
-                                v.get('id') == vlan_id for v in result_data['vlans']):
+                    if vlan_id not in [v.get('id') for v in result_data['vlans']]:
+                        try:
+                            logger.info(f"Querying NetBox for VLAN: {vlan_id}")
+                            vlan_data = self._make_request(f"api/ipam/vlans/{vlan_id}/")
+                            vlan_data['web_url'] = f"{self.config.base_url}/ipam/vlans/{vlan_id}/"
                             result_data['vlans'].append(vlan_data)
+                        except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                            logger.warning(f"Failed to query VLAN details: {e}")
+            
+            # Query services associated with devices or VMs
+            for device in result_data['devices']:
+                device_id = device.get('id')
+                if device_id:
+                    try:
+                        logger.info(f"Querying NetBox for services on device: {device_id}")
+                        services_data = self._make_request(f"api/ipam/services/?device_id={device_id}")
+                        services = services_data.get('results', [])
+                        for service in services:
+                            if 'id' in service:
+                                service['web_url'] = f"{self.config.base_url}/ipam/services/{service['id']}/"
+                        result_data['services'].extend(services)
                     except (AuthenticationError, ConnectionError, ApplicationError) as e:
-                        logger.warning(f"Failed to query VLAN details: {e}")
+                        logger.warning(f"Failed to query services for device {device_id}: {e}")
+            
+            for vm in result_data['virtual_machines']:
+                vm_id = vm.get('id')
+                if vm_id:
+                    try:
+                        logger.info(f"Querying NetBox for services on VM: {vm_id}")
+                        services_data = self._make_request(f"api/ipam/services/?virtual_machine_id={vm_id}")
+                        services = services_data.get('results', [])
+                        for service in services:
+                            if 'id' in service:
+                                service['web_url'] = f"{self.config.base_url}/ipam/services/{service['id']}/"
+                        result_data['services'].extend(services)
+                    except (AuthenticationError, ConnectionError, ApplicationError) as e:
+                        logger.warning(f"Failed to query services for VM {vm_id}: {e}")
 
             # Determine success based on whether we found any data
             has_data = any([
@@ -471,7 +653,15 @@ class NetBoxSubmodule(ApplicationSubmodule):
                 result_data['devices'],
                 result_data['interfaces'],
                 result_data['vlans'],
-                result_data['vrfs']
+                result_data['vrfs'],
+                result_data['virtual_machines'],
+                result_data['clusters'],
+                result_data['sites'],
+                result_data['tenants'],
+                result_data['contacts'],
+                result_data['ip_ranges'],
+                result_data['aggregates'],
+                result_data['services']
             ])
 
             return ApplicationResult(
@@ -542,7 +732,8 @@ class CheckMKSubmodule(ApplicationSubmodule):
                 'notifications': [],
                 'performance_data': [],
                 'check_results': [],
-                'source': 'CheckMK Monitoring'
+                'source': 'CheckMK Monitoring',
+                'base_url': self.config.base_url if self.config else None  # Add base URL for link generation
             }
 
             # Query all host configs to find matching IP
@@ -573,6 +764,15 @@ class CheckMKSubmodule(ApplicationSubmodule):
                         host_names.append(host_id)
 
                 logger.info(f"Found {len(matching_hosts)} matching hosts for IP {ip}")
+                
+                # Add URLs to matching hosts
+                for host in matching_hosts:
+                    host_id = host.get('id', 'unknown')
+                    # CheckMK web UI URL format: /check_mk/view.py?view_name=host&host=HOSTNAME
+                    # Or for modern UI: /SITE/check_mk/index.py?start_url=%2FSITE%2Fcheck_mk%2Fview.py%3Fview_name%3Dhost%26host%3DHOSTNAME
+                    # Simplified: /check_mk/view.py?view_name=host&host=HOSTNAME
+                    host['web_url'] = f"{self.config.base_url}/check_mk/view.py?view_name=host&host={host_id}"
+                
                 result_data['hosts'] = matching_hosts
 
                 # If we found matching hosts, query additional information
@@ -601,6 +801,13 @@ class CheckMKSubmodule(ApplicationSubmodule):
                                 }
                             )
                             services = services_response.get('value', [])
+                            
+                            # Add URLs to services
+                            for service in services:
+                                service_desc = service.get('id', '')
+                                # CheckMK service URL format: /check_mk/view.py?view_name=service&host=HOSTNAME&service=SERVICEDESC
+                                service['web_url'] = f"{self.config.base_url}/check_mk/view.py?view_name=service&host={host_name}&service={service_desc}"
+                            
                             result_data['services'].extend(services)
 
                             # Extract performance data from services

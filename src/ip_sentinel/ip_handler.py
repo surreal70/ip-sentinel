@@ -1,5 +1,5 @@
 """
-IP Address handling and validation for IP Intelligence Analyzer.
+IP Address handling and validation for IP-Sentinel.
 
 This module provides comprehensive IP address validation, normalization,
 and network calculation utilities supporting both IPv4 and IPv6.

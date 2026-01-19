@@ -1,5 +1,5 @@
 """
-Command-line interface for IP Intelligence Analyzer.
+Command-line interface for IP-Sentinel.
 """
 
 import argparse
@@ -14,8 +14,8 @@ from .config import ConfigManager, ClassificationRule, Config
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the command-line argument parser."""
     parser = argparse.ArgumentParser(
-        prog="ip-mana",
-        description="IP Intelligence Analyzer - Comprehensive IP address analysis tool",
+        prog="ip-sentinel",
+        description="IP-Sentinel - Comprehensive IP address analysis tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -30,6 +30,9 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Output format options
     output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument(
+        "--human", action="store_true", help="Output results in human-readable format (default)"
+    )
     output_group.add_argument(
         "--json", action="store_true", help="Output results in JSON format"
     )
@@ -123,6 +126,20 @@ def create_parser() -> argparse.ArgumentParser:
         "-v",
         action="store_true",
         help="Enable verbose output for debugging",
+    )
+
+    # Root privilege control
+    parser.add_argument(
+        "--run-root",
+        action="store_true",
+        help="Enable tests requiring root/administrator privileges (nmap OS detection, certain port scans)",
+    )
+
+    # SSL certificate verification control
+    parser.add_argument(
+        "--no-cert-check",
+        action="store_true",
+        help="Disable SSL certificate verification (WARNING: This is insecure and should only be used for testing)",
     )
 
     return parser
@@ -252,7 +269,7 @@ def main(args: Optional[List[str]] = None) -> int:
 
             # Perform analysis
             if parsed_args.verbose:
-                print(f"IP-ManA v{__version__}")
+                print(f"IP-Sentinel v{__version__}")
                 print(f"Analyzing IP: {parsed_args.ip_address}")
                 print(f"Output format: {config.output_format}")
                 print(f"Reporting mode: {config.reporting_mode}")
@@ -296,12 +313,14 @@ def build_config_from_args(args) -> Config:
     """
     from .config import Config
 
-    # Determine output format
+    # Determine output format (human is default)
     output_format = "human"
     if args.json:
         output_format = "json"
     elif args.html:
         output_format = "html"
+    elif args.human:
+        output_format = "human"
 
     # Determine reporting mode
     reporting_mode = "dense"
@@ -328,12 +347,21 @@ def build_config_from_args(args) -> Config:
     # Determine database path
     database_path = Path(args.db_path) if args.db_path else None
 
+    # Determine SSL verification (inverse of no_cert_check)
+    verify_ssl = not args.no_cert_check
+
+    # Display warning if certificate verification is disabled
+    if args.no_cert_check and args.verbose:
+        print("WARNING: SSL certificate verification is disabled. This is insecure!")
+
     return Config(
         database_path=database_path,
         output_format=output_format,
         reporting_mode=reporting_mode,
         force_internet=force_internet,
         enabled_modules=enabled_modules,
+        run_root=args.run_root,
+        verify_ssl=verify_ssl,
         verbose=args.verbose
     )
 

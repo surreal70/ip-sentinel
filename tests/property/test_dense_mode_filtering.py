@@ -11,8 +11,8 @@ from ipaddress import IPv4Address, IPv6Address
 import hypothesis.strategies as st
 from hypothesis import given
 
-from src.ip_mana.analyzer import AnalysisResult
-from src.ip_mana.formatters import HumanFormatter, JSONFormatter, HTMLFormatter, VerbosityMode
+from src.ip_sentinel.analyzer import AnalysisResult
+from src.ip_sentinel.formatters import HumanFormatter, JSONFormatter, HTMLFormatter, VerbosityMode
 
 
 # Strategies for generating test data with controlled empty/meaningful data

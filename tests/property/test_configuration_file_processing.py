@@ -11,8 +11,8 @@ from pathlib import Path
 import tempfile
 import json
 
-from src.ip_mana.config import Config, ConfigManager
-from src.ip_mana.cli import build_config_from_args
+from src.ip_sentinel.config import Config, ConfigManager
+from src.ip_sentinel.cli import build_config_from_args
 import argparse
 
 

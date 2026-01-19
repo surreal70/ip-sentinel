@@ -1,4 +1,4 @@
-# IP-ManA Configuration Guide
+# IP-Sentinel Configuration Guide
 
 This document describes all configuration options for IP Intelligence Analyzer.
 
@@ -14,7 +14,7 @@ This document describes all configuration options for IP Intelligence Analyzer.
 
 ### Default Classifications File
 
-On first run, IP-ManA creates `classifications.json` with RFC-compliant IP ranges:
+On first run, IP-Sentinel creates `classifications.json` with RFC-compliant IP ranges:
 
 ```json
 {
@@ -65,7 +65,7 @@ On first run, IP-ManA creates `classifications.json` with RFC-compliant IP range
 
 **Add a classification**:
 ```bash
-ip-mana --add-classification \
+ip-sentinel --add-classification \
     "DMZ Network" \
     "172.16.100.0/24" \
     "Demilitarized zone for public services" \
@@ -74,12 +74,12 @@ ip-mana --add-classification \
 
 **Delete a classification**:
 ```bash
-ip-mana --delete-classification "DMZ Network"
+ip-sentinel --delete-classification "DMZ Network"
 ```
 
 **List all classifications**:
 ```bash
-ip-mana --list-classifications
+ip-sentinel --list-classifications
 ```
 
 ### Manual Configuration File Editing
@@ -97,7 +97,7 @@ You can also edit `classifications.json` directly:
 }
 ```
 
-**Important**: Restart IP-ManA after manual edits to reload configuration.
+**Important**: Restart IP-Sentinel after manual edits to reload configuration.
 
 ## Application Credentials
 
@@ -107,7 +107,7 @@ Default: `config/app_credentials.json`
 
 Custom location:
 ```bash
-ip-mana --credentials /path/to/custom-credentials.json --netbox 192.168.1.1
+ip-sentinel --credentials /path/to/custom-credentials.json --netbox 192.168.1.1
 ```
 
 ### Credentials File Format
@@ -229,19 +229,19 @@ Default: `ip_analysis.db` in current working directory
 
 **Via command-line**:
 ```bash
-ip-mana --database /var/lib/ip-mana/production.db 192.168.1.1
+ip-sentinel --database /var/lib/ip-sentinel/production.db 192.168.1.1
 ```
 
 **Via environment variable** (planned):
 ```bash
-export IP_MANA_DATABASE=/var/lib/ip-mana/production.db
-ip-mana 192.168.1.1
+export IP_MANA_DATABASE=/var/lib/ip-sentinel/production.db
+ip-sentinel 192.168.1.1
 ```
 
 ### Disable Database Storage
 
 ```bash
-ip-mana --no-database 192.168.1.1
+ip-sentinel --no-database 192.168.1.1
 ```
 
 ### Database Schema
@@ -300,7 +300,7 @@ sqlite3 ip_analysis.db "VACUUM;"
 ### Complete Options Reference
 
 ```
-Usage: ip-mana [OPTIONS] IP_ADDRESS
+Usage: ip-sentinel [OPTIONS] IP_ADDRESS
 
 Options:
   --version                Show version and exit
@@ -348,12 +348,12 @@ Options:
 
 **Multiple options combined**:
 ```bash
-ip-mana --json --full --netbox --checkmk --database /tmp/test.db 192.168.1.1
+ip-sentinel --json --full --netbox --checkmk --database /tmp/test.db 192.168.1.1
 ```
 
 **Long-form options**:
 ```bash
-ip-mana --output-format=json --reporting-mode=full 192.168.1.1
+ip-sentinel --output-format=json --reporting-mode=full 192.168.1.1
 ```
 
 ## Environment Variables
@@ -364,10 +364,10 @@ These are planned for future releases:
 
 ```bash
 # Database location
-export IP_MANA_DATABASE=/var/lib/ip-mana/production.db
+export IP_MANA_DATABASE=/var/lib/ip-sentinel/production.db
 
 # Credentials file
-export IP_MANA_CREDENTIALS=/etc/ip-mana/credentials.json
+export IP_MANA_CREDENTIALS=/etc/ip-sentinel/credentials.json
 
 # Default output format
 export IP_MANA_OUTPUT_FORMAT=json
@@ -379,17 +379,17 @@ export IP_MANA_REPORTING_MODE=full
 export IP_MANA_VERBOSE=1
 
 # Classification file location
-export IP_MANA_CLASSIFICATIONS=/etc/ip-mana/classifications.json
+export IP_MANA_CLASSIFICATIONS=/etc/ip-sentinel/classifications.json
 ```
 
 ## Configuration File (Future)
 
 ### Planned Configuration File Support
 
-Future versions will support a configuration file (e.g., `~/.ip-mana/config.yaml`):
+Future versions will support a configuration file (e.g., `~/.ip-sentinel/config.yaml`):
 
 ```yaml
-# IP-ManA Configuration File
+# IP-Sentinel Configuration File
 
 # Default output format: human, json, html
 output_format: human
@@ -400,7 +400,7 @@ reporting_mode: dense
 # Database configuration
 database:
   enabled: true
-  path: /var/lib/ip-mana/production.db
+  path: /var/lib/ip-sentinel/production.db
   auto_cleanup: true
   retention_days: 90
 
@@ -416,12 +416,12 @@ modules:
     force_for_private: false
   module4:
     enabled: false
-    credentials_file: /etc/ip-mana/credentials.json
+    credentials_file: /etc/ip-sentinel/credentials.json
 
 # Logging
 logging:
   level: INFO
-  file: /var/log/ip-mana/ip-mana.log
+  file: /var/log/ip-sentinel/ip-sentinel.log
   max_size_mb: 100
   backup_count: 5
 
@@ -438,12 +438,12 @@ performance:
 
 For advanced users, module behavior can be customized by editing source code:
 
-**Module 2 (Local Info)** - `src/ip_mana/modules/local_info.py`:
+**Module 2 (Local Info)** - `src/ip_sentinel/modules/local_info.py`:
 - Nmap scan options
 - Timeout values
 - Port ranges
 
-**Module 3 (Internet Info)** - `src/ip_mana/modules/internet_info.py`:
+**Module 3 (Internet Info)** - `src/ip_sentinel/modules/internet_info.py`:
 - API endpoints
 - Timeout values
 - Retry logic
@@ -452,10 +452,10 @@ For advanced users, module behavior can be customized by editing source code:
 
 **Ansible example**:
 ```yaml
-- name: Deploy IP-ManA configuration
+- name: Deploy IP-Sentinel configuration
   template:
     src: app_credentials.json.j2
-    dest: /etc/ip-mana/app_credentials.json
+    dest: /etc/ip-sentinel/app_credentials.json
     mode: 0600
     owner: ipmana
     group: ipmana
@@ -463,7 +463,7 @@ For advanced users, module behavior can be customized by editing source code:
 
 **Puppet example**:
 ```puppet
-file { '/etc/ip-mana/app_credentials.json':
+file { '/etc/ip-sentinel/app_credentials.json':
   ensure  => file,
   content => template('ipmana/app_credentials.json.erb'),
   mode    => '0600',
@@ -512,7 +512,7 @@ sqlite3 ip_analysis.db "SELECT 1;"
 4. **Backup**: Regularly backup database and configuration files
 5. **Security**: Use restrictive file permissions for sensitive files
 6. **Monitoring**: Monitor database size and performance
-7. **Updates**: Review configuration when upgrading IP-ManA versions
+7. **Updates**: Review configuration when upgrading IP-Sentinel versions
 
 ## Additional Resources
 

@@ -1,4 +1,4 @@
-# IP-ManA Usage Examples
+# IP-Sentinel Usage Examples
 
 This document provides practical examples for using IP Intelligence Analyzer in various scenarios.
 
@@ -19,29 +19,29 @@ This document provides practical examples for using IP Intelligence Analyzer in 
 
 ```bash
 # Analyze a private IP
-ip-mana 192.168.1.1
+ip-sentinel 192.168.1.1
 
 # Analyze a public IP
-ip-mana 8.8.8.8
+ip-sentinel 8.8.8.8
 
 # Analyze an IPv6 address
-ip-mana 2001:4860:4860::8888
+ip-sentinel 2001:4860:4860::8888
 
 # Analyze localhost
-ip-mana 127.0.0.1
+ip-sentinel 127.0.0.1
 ```
 
 ### Quick Information Lookup
 
 ```bash
 # Get just the classification
-ip-mana --dense 192.168.1.1 | grep -A 5 "Classification"
+ip-sentinel --dense 192.168.1.1 | grep -A 5 "Classification"
 
 # Check if IP is reachable
-ip-mana --dense 192.168.1.1 | grep "Reachable"
+ip-sentinel --dense 192.168.1.1 | grep "Reachable"
 
 # Get geolocation for public IP
-ip-mana --dense 8.8.8.8 | grep -A 10 "Geolocation"
+ip-sentinel --dense 8.8.8.8 | grep -A 10 "Geolocation"
 ```
 
 ## Output Formats
@@ -49,7 +49,7 @@ ip-mana --dense 8.8.8.8 | grep -A 10 "Geolocation"
 ### Human-Readable Output (Default)
 
 ```bash
-ip-mana 192.168.1.1
+ip-sentinel 192.168.1.1
 ```
 
 Output:
@@ -74,32 +74,32 @@ Local Information:
 
 ```bash
 # Output to console
-ip-mana --json 192.168.1.1
+ip-sentinel --json 192.168.1.1
 
 # Save to file
-ip-mana --json 192.168.1.1 > analysis.json
+ip-sentinel --json 192.168.1.1 > analysis.json
 
 # Pretty-print JSON
-ip-mana --json 192.168.1.1 | python -m json.tool
+ip-sentinel --json 192.168.1.1 | python -m json.tool
 
 # Extract specific field with jq
-ip-mana --json 192.168.1.1 | jq '.classifications'
+ip-sentinel --json 192.168.1.1 | jq '.classifications'
 ```
 
 ### HTML Output
 
 ```bash
 # Generate HTML report
-ip-mana --html 192.168.1.1 > report.html
+ip-sentinel --html 192.168.1.1 > report.html
 
 # Open in browser (Linux)
-ip-mana --html 192.168.1.1 > report.html && xdg-open report.html
+ip-sentinel --html 192.168.1.1 > report.html && xdg-open report.html
 
 # Open in browser (macOS)
-ip-mana --html 192.168.1.1 > report.html && open report.html
+ip-sentinel --html 192.168.1.1 > report.html && open report.html
 
 # Open in browser (Windows)
-ip-mana --html 192.168.1.1 > report.html && start report.html
+ip-sentinel --html 192.168.1.1 > report.html && start report.html
 ```
 
 ## Reporting Modes
@@ -109,9 +109,9 @@ ip-mana --html 192.168.1.1 > report.html && start report.html
 Shows only data where information was collected:
 
 ```bash
-ip-mana --dense 192.168.1.1
+ip-sentinel --dense 192.168.1.1
 # or simply
-ip-mana 192.168.1.1
+ip-sentinel 192.168.1.1
 ```
 
 ### Full Mode
@@ -119,7 +119,7 @@ ip-mana 192.168.1.1
 Shows all tests, including those with no results:
 
 ```bash
-ip-mana --full 192.168.1.1
+ip-sentinel --full 192.168.1.1
 ```
 
 Output includes:
@@ -135,7 +135,7 @@ Spam Lists: No results
 Includes error messages, timeouts, and failure reasons:
 
 ```bash
-ip-mana --full-err 192.168.1.1
+ip-sentinel --full-err 192.168.1.1
 ```
 
 Output includes:
@@ -153,10 +153,10 @@ Analyze private IPs with internet lookups:
 
 ```bash
 # Force Module 3 for private IP
-ip-mana --force-internet 192.168.1.1
+ip-sentinel --force-internet 192.168.1.1
 
 # Alternative syntax
-ip-mana --force-module3 192.168.1.1
+ip-sentinel --force-module3 192.168.1.1
 ```
 
 ### Disable Specific Modules
@@ -174,21 +174,21 @@ ip-mana --force-module3 192.168.1.1
 ### List All Classifications
 
 ```bash
-ip-mana --list-classifications
+ip-sentinel --list-classifications
 ```
 
 ### Add Custom Classification
 
 ```bash
 # Add a custom network range
-ip-mana --add-classification \
+ip-sentinel --add-classification \
     "Office Network" \
     "10.50.0.0/16" \
     "Corporate office network" \
     "module2,module3"
 
 # Add DMZ network
-ip-mana --add-classification \
+ip-sentinel --add-classification \
     "DMZ" \
     "172.16.100.0/24" \
     "Demilitarized zone" \
@@ -198,15 +198,15 @@ ip-mana --add-classification \
 ### Delete Classification
 
 ```bash
-ip-mana --delete-classification "Office Network"
+ip-sentinel --delete-classification "Office Network"
 ```
 
 ### Modify Classification
 
 ```bash
 # Delete old, add new
-ip-mana --delete-classification "Office Network"
-ip-mana --add-classification \
+ip-sentinel --delete-classification "Office Network"
+ip-sentinel --add-classification \
     "Office Network" \
     "10.50.0.0/15" \
     "Expanded office network" \
@@ -219,40 +219,40 @@ ip-mana --add-classification \
 
 ```bash
 # Query NetBox for IP information
-ip-mana --netbox 192.168.1.100
+ip-sentinel --netbox 192.168.1.100
 
 # Combine with other output formats
-ip-mana --netbox --json 192.168.1.100 > netbox-report.json
+ip-sentinel --netbox --json 192.168.1.100 > netbox-report.json
 ```
 
 ### CheckMK Monitoring Integration
 
 ```bash
 # Query CheckMK for monitoring data
-ip-mana --checkmk 192.168.1.100
+ip-sentinel --checkmk 192.168.1.100
 
 # Full error mode to see connection issues
-ip-mana --checkmk --full-err 192.168.1.100
+ip-sentinel --checkmk --full-err 192.168.1.100
 ```
 
 ### OpenVAS Vulnerability Scanner Integration
 
 ```bash
 # Query OpenVAS for vulnerability data
-ip-mana --openvas 192.168.1.100
+ip-sentinel --openvas 192.168.1.100
 
 # Combine with full mode
-ip-mana --openvas --full 192.168.1.100
+ip-sentinel --openvas --full 192.168.1.100
 ```
 
 ### Multiple Application Modules
 
 ```bash
 # Query all application modules
-ip-mana --netbox --checkmk --openvas 192.168.1.100
+ip-sentinel --netbox --checkmk --openvas 192.168.1.100
 
 # With custom credentials file
-ip-mana --credentials /etc/ip-mana/prod-creds.json \
+ip-sentinel --credentials /etc/ip-sentinel/prod-creds.json \
     --netbox --checkmk --openvas \
     192.168.1.100
 ```
@@ -265,17 +265,17 @@ ip-mana --credentials /etc/ip-mana/prod-creds.json \
 # Simple loop
 for ip in 192.168.1.{1..10}; do
     echo "Analyzing $ip..."
-    ip-mana --dense $ip
+    ip-sentinel --dense $ip
 done
 
 # Save each to separate file
 for ip in 192.168.1.{1..10}; do
-    ip-mana --json $ip > "analysis-${ip}.json"
+    ip-sentinel --json $ip > "analysis-${ip}.json"
 done
 
 # From file
 while read ip; do
-    ip-mana --dense $ip
+    ip-sentinel --dense $ip
 done < ip-list.txt
 ```
 
@@ -283,10 +283,10 @@ done < ip-list.txt
 
 ```bash
 # Using GNU parallel
-cat ip-list.txt | parallel -j 4 ip-mana --json {} > results.json
+cat ip-list.txt | parallel -j 4 ip-sentinel --json {} > results.json
 
 # Using xargs
-cat ip-list.txt | xargs -P 4 -I {} ip-mana --dense {}
+cat ip-list.txt | xargs -P 4 -I {} ip-sentinel --dense {}
 ```
 
 ### Batch Analysis Script
@@ -301,7 +301,7 @@ mkdir -p "$OUTPUT_DIR"
 while read ip; do
     echo "Analyzing $ip..."
     timestamp=$(date +%Y%m%d-%H%M%S)
-    ip-mana --json --full $ip > "$OUTPUT_DIR/${ip}-${timestamp}.json"
+    ip-sentinel --json --full $ip > "$OUTPUT_DIR/${ip}-${timestamp}.json"
     sleep 1  # Rate limiting
 done < "$1"
 
@@ -330,7 +330,7 @@ nmap -sn $SUBNET -oG - | grep "Up" | awk '{print $2}' > live-hosts.txt
 # Analyze each host
 while read ip; do
     echo "=== Analyzing $ip ==="
-    ip-mana --full $ip
+    ip-sentinel --full $ip
     echo ""
 done < live-hosts.txt
 ```
@@ -347,7 +347,7 @@ echo "Security Audit for $IP"
 echo "====================="
 
 # Full analysis with all modules
-ip-mana --full-err --netbox --checkmk --openvas $IP > audit-report.txt
+ip-sentinel --full-err --netbox --checkmk --openvas $IP > audit-report.txt
 
 # Extract security-relevant information
 echo ""
@@ -374,7 +374,7 @@ PREVIOUS_SCAN="previous-scan.json"
 CURRENT_SCAN="current-scan.json"
 
 # Perform scan
-ip-mana --json $IP > $CURRENT_SCAN
+ip-sentinel --json $IP > $CURRENT_SCAN
 
 # Compare with previous scan
 if [ -f "$PREVIOUS_SCAN" ]; then
@@ -393,20 +393,20 @@ cp $CURRENT_SCAN $PREVIOUS_SCAN
 
 ```bash
 # Analyze and store in custom database
-ip-mana --database /var/lib/ip-mana/production.db 192.168.1.1
+ip-sentinel --database /var/lib/ip-sentinel/production.db 192.168.1.1
 
 # Analyze without storing
-ip-mana --no-database 192.168.1.1
+ip-sentinel --no-database 192.168.1.1
 
 # Query database directly
-sqlite3 /var/lib/ip-mana/production.db "SELECT * FROM scans WHERE ip_address='192.168.1.1';"
+sqlite3 /var/lib/ip-sentinel/production.db "SELECT * FROM scans WHERE ip_address='192.168.1.1';"
 ```
 
 ### Custom Output Processing
 
 ```bash
 # Extract specific information with jq
-ip-mana --json 8.8.8.8 | jq '{
+ip-sentinel --json 8.8.8.8 | jq '{
     ip: .ip_address,
     country: .internet_info.geolocation.country,
     asn: .internet_info.asn_info.asn,
@@ -416,7 +416,7 @@ ip-mana --json 8.8.8.8 | jq '{
 # Create CSV from multiple scans
 echo "IP,Country,ASN,Reputation" > results.csv
 for ip in $(cat ip-list.txt); do
-    ip-mana --json $ip | jq -r '[
+    ip-sentinel --json $ip | jq -r '[
         .ip_address,
         .internet_info.geolocation.country,
         .internet_info.asn_info.asn,
@@ -429,14 +429,14 @@ done
 
 ```bash
 # Pipe to other security tools
-ip-mana --json 192.168.1.1 | security-analyzer
+ip-sentinel --json 192.168.1.1 | security-analyzer
 
 # Use with Ansible
 ansible-playbook -i inventory.yml analyze-ips.yml \
-    --extra-vars "ip_mana_cmd='ip-mana --json'"
+    --extra-vars "ip_sentinel_cmd='ip-sentinel --json'"
 
 # Use with Docker
-docker run -v $(pwd):/data ip-mana --json 192.168.1.1 > /data/result.json
+docker run -v $(pwd):/data ip-sentinel --json 192.168.1.1 > /data/result.json
 ```
 
 ## Tips and Best Practices
@@ -456,10 +456,10 @@ docker run -v $(pwd):/data ip-mana --json 192.168.1.1 > /data/result.json
 
 ```bash
 # Verbose output
-ip-mana --verbose --full-err 192.168.1.1
+ip-sentinel --verbose --full-err 192.168.1.1
 
 # Test specific module
-ip-mana --netbox --verbose 192.168.1.1
+ip-sentinel --netbox --verbose 192.168.1.1
 
 # Check credentials
 cat config/app_credentials.json | jq '.netbox'
@@ -469,25 +469,25 @@ cat config/app_credentials.json | jq '.netbox'
 
 ```bash
 # Time analysis
-time ip-mana 192.168.1.1
+time ip-sentinel 192.168.1.1
 
 # Profile with different modes
-time ip-mana --dense 192.168.1.1
-time ip-mana --full 192.168.1.1
-time ip-mana --full-err 192.168.1.1
+time ip-sentinel --dense 192.168.1.1
+time ip-sentinel --full 192.168.1.1
+time ip-sentinel --full-err 192.168.1.1
 ```
 
 ### Validate Output
 
 ```bash
 # Validate JSON output
-ip-mana --json 192.168.1.1 | python -m json.tool > /dev/null && echo "Valid JSON"
+ip-sentinel --json 192.168.1.1 | python -m json.tool > /dev/null && echo "Valid JSON"
 
 # Check for errors in output
-ip-mana --full-err 192.168.1.1 | grep -i error
+ip-sentinel --full-err 192.168.1.1 | grep -i error
 
 # Verify database storage
-ip-mana 192.168.1.1
+ip-sentinel 192.168.1.1
 sqlite3 ip_analysis.db "SELECT COUNT(*) FROM scans;"
 ```
 

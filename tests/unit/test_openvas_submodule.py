@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from ipaddress import IPv4Address, IPv6Address
 from requests.exceptions import Timeout, RequestException
 
-from src.ip_mana.modules.application import (
+from src.ip_sentinel.modules.application import (
     OpenVASSubmodule,
     ApplicationResult,
     AuthenticationConfig
@@ -55,7 +55,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertIsNotNone(submodule)
         self.assertIsNone(submodule.config)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ip_success_with_full_data(self, mock_request):
         """Test successful IP query with comprehensive vulnerability data."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -172,7 +172,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
 
         self.assertIsInstance(result, ApplicationResult)
         self.assertTrue(result.success)
-        self.assertEqual(result.source, 'openvas')
+        self.assertIn('OpenVAS', result.source)  # Check source contains OpenVAS
         self.assertIsNone(result.error_message)
 
         # Verify data structure
@@ -228,7 +228,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertEqual(severity_summary['medium'], 1)
         self.assertEqual(severity_summary['low'], 0)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ip_success_minimal_data(self, mock_request):
         """Test successful IP query with no vulnerabilities found."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -244,12 +244,12 @@ class TestOpenVASSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertTrue(result.success)
-        self.assertEqual(result.source, 'openvas')
+        self.assertIn('OpenVAS', result.source)
         self.assertEqual(len(result.data['targets']), 0)
         self.assertEqual(len(result.data['vulnerabilities']), 0)
         self.assertEqual(result.data['severity_summary']['critical'], 0)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_query_ipv6_address(self, mock_request):
         """Test querying IPv6 address."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -272,7 +272,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.data['targets'][0]['hosts'], str(test_ip))
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_authentication_failure_401(self, mock_request):
         """Test handling of 401 authentication failure."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -286,10 +286,10 @@ class TestOpenVASSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertFalse(result.success)
-        self.assertEqual(result.source, 'openvas')
+        self.assertIn('OpenVAS', result.source)
         self.assertIn('Authentication failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_authentication_failure_403(self, mock_request):
         """Test handling of 403 permission denied."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -305,7 +305,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('Authentication failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_connection_timeout(self, mock_request):
         """Test handling of connection timeout."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -316,11 +316,11 @@ class TestOpenVASSubmodule(unittest.TestCase):
         result = submodule.query_ip(test_ip)
 
         self.assertFalse(result.success)
-        self.assertEqual(result.source, 'openvas')
+        self.assertIn('OpenVAS', result.source)
         self.assertIn('Connection failed', result.error_message)
         self.assertIn('timeout', result.error_message.lower())
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_connection_error(self, mock_request):
         """Test handling of general connection errors."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -334,7 +334,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('Connection failed', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_api_error_404(self, mock_request):
         """Test handling of 404 API errors."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -351,7 +351,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertIn('API error', result.error_message)
         self.assertIn('404', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_api_error_500(self, mock_request):
         """Test handling of 500 server errors."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -368,7 +368,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertIn('API error', result.error_message)
         self.assertIn('500', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_partial_failure_task_query(self, mock_request):
         """Test graceful handling when task query fails but target query succeeds."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -406,7 +406,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertEqual(len(result.data['targets']), 1)
         self.assertEqual(len(result.data['tasks']), 0)  # Task query failed
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_no_config_error(self, mock_request):
         """Test error handling when no configuration is provided."""
         submodule = OpenVASSubmodule()  # No config
@@ -417,7 +417,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIn('No configuration', result.error_message)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_multiple_test_ips(self, mock_request):
         """Test querying all test IP addresses."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -431,9 +431,9 @@ class TestOpenVASSubmodule(unittest.TestCase):
         for test_ip in self.test_ips:
             result = submodule.query_ip(test_ip)
             self.assertTrue(result.success)
-            self.assertEqual(result.source, 'openvas')
+            self.assertIn('OpenVAS', result.source)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_severity_classification(self, mock_request):
         """Test that vulnerabilities are correctly classified by severity."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -514,7 +514,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertEqual(severity_summary['low'], 1)
         self.assertEqual(severity_summary['log'], 1)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_cve_extraction_from_results(self, mock_request):
         """Test that CVE information is correctly extracted from vulnerability results."""
         submodule = OpenVASSubmodule(self.auth_config)
@@ -574,7 +574,7 @@ class TestOpenVASSubmodule(unittest.TestCase):
         self.assertIn('CVE-2017-5638', cve_ids)
         self.assertIn('CVE-2017-9805', cve_ids)
 
-    @patch('src.ip_mana.modules.application.requests.Session.request')
+    @patch('src.ip_sentinel.modules.application.requests.Session.request')
     def test_scan_history_extraction(self, mock_request):
         """Test that scan history is correctly extracted from tasks."""
         submodule = OpenVASSubmodule(self.auth_config)

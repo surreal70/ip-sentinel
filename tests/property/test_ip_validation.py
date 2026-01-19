@@ -12,7 +12,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from src.ip_mana.ip_handler import IPAddressHandler, IPAddressValidationError
+from src.ip_sentinel.ip_handler import IPAddressHandler, IPAddressValidationError
 
 
 class TestIPAddressValidation:

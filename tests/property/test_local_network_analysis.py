@@ -9,7 +9,7 @@ from hypothesis import given, strategies as st, settings
 from ipaddress import IPv4Address, IPv6Address
 from unittest.mock import patch, MagicMock
 
-from src.ip_mana.modules.local_info import LocalInfoModule, LocalInfoResult
+from src.ip_sentinel.modules.local_info import LocalInfoModule, LocalInfoResult
 
 
 # Strategy for generating valid IP addresses
@@ -46,10 +46,10 @@ class TestLocalNetworkAnalysisCompleteness:
         **Validates: Requirements 7.1, 7.2, 7.3, 7.8, 7.9, 7.10**
         """
         # Mock external dependencies to ensure consistent testing
-        with patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces, \
-                patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess, \
-                patch('src.ip_mana.modules.local_info.nmap.PortScanner') as mock_nmap, \
-                patch('src.ip_mana.modules.local_info.socket') as mock_socket:
+        with patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces, \
+                patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess, \
+                patch('src.ip_sentinel.modules.local_info.nmap.PortScanner') as mock_nmap, \
+                patch('src.ip_sentinel.modules.local_info.socket') as mock_socket:
 
             # Setup mocks for consistent behavior
             self._setup_mocks(
@@ -105,10 +105,10 @@ class TestLocalNetworkAnalysisCompleteness:
         This ensures the module attempts subnet checking, ping testing, MAC discovery,
         and nmap scanning for any valid IP address input.
         """
-        with patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces, \
-                patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess, \
-                patch('src.ip_mana.modules.local_info.nmap.PortScanner') as mock_nmap, \
-                patch('src.ip_mana.modules.local_info.socket') as mock_socket:
+        with patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces, \
+                patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess, \
+                patch('src.ip_sentinel.modules.local_info.nmap.PortScanner') as mock_nmap, \
+                patch('src.ip_sentinel.modules.local_info.socket') as mock_socket:
 
             self._setup_mocks(
                 mock_netifaces,
@@ -180,10 +180,10 @@ class TestLocalAnalysisErrorHandling:
         The module should handle network errors, permission issues, and missing
         tools gracefully without terminating the entire analysis.
         """
-        with patch('src.ip_mana.modules.local_info.netifaces') as mock_netifaces, \
-                patch('src.ip_mana.modules.local_info.subprocess') as mock_subprocess, \
-                patch('src.ip_mana.modules.local_info.nmap.PortScanner') as mock_nmap, \
-                patch('src.ip_mana.modules.local_info.socket') as mock_socket:
+        with patch('src.ip_sentinel.modules.local_info.netifaces') as mock_netifaces, \
+                patch('src.ip_sentinel.modules.local_info.subprocess') as mock_subprocess, \
+                patch('src.ip_sentinel.modules.local_info.nmap.PortScanner') as mock_nmap, \
+                patch('src.ip_sentinel.modules.local_info.socket') as mock_socket:
 
             # Setup mocks to simulate failures during analysis, not initialization
             mock_netifaces.interfaces.side_effect = Exception("Network interface error")

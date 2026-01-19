@@ -683,6 +683,9 @@ class HumanFormatter(OutputFormatter):
                                     display_info = self._extract_display_info(item, key)
                                     if display_info:
                                         output_lines.append(f"          • {display_info}")
+                                else:
+                                    # Item is not a dict, just show it directly
+                                    output_lines.append(f"          • {item}")
                             
                             if len(value) > max_items:
                                 remaining = len(value) - max_items
@@ -711,7 +714,7 @@ class HumanFormatter(OutputFormatter):
             Formatted display string
         """
         # CheckMK services - show description with state and output
-        if category == 'services':
+        if category == 'services' and 'extensions' in item:
             extensions = item.get('extensions', {})
             description = extensions.get('description', '')
             state = extensions.get('state')
@@ -761,17 +764,128 @@ class HumanFormatter(OutputFormatter):
             elif 'id' in item:
                 # Extract service name from ID (format: "hostname:service_name")
                 service_id = item['id']
-                if ':' in service_id:
-                    service_name = service_id.split(':', 1)[1]
+                # Convert to string if it's not already
+                service_id_str = str(service_id)
+                if ':' in service_id_str:
+                    service_name = service_id_str.split(':', 1)[1]
                     if plugin_output:
                         return f"{state_indicator} {service_name}: {plugin_output}"
                     return f"{state_indicator} {service_name}"
-                return service_id
+                return service_id_str
         
         # Common fields to look for
         display = item.get('display')
-        if display:
+        if display and category not in ['virtual_machines', 'clusters', 'sites', 'tenants', 'aggregates', 'ip_ranges', 'contacts', 'services']:
             return str(display)
+        
+        # Category-specific extraction (must come before generic name check)
+        if category == 'virtual_machines':
+            vm_name = item.get('name', '')
+            vm_status = item.get('status', {})
+            status_label = vm_status.get('label', '') if isinstance(vm_status, dict) else ''
+            cluster = item.get('cluster', {})
+            cluster_name = cluster.get('name', '') if isinstance(cluster, dict) else ''
+            
+            parts = [vm_name]
+            if status_label:
+                parts.append(f"Status: {status_label}")
+            if cluster_name:
+                parts.append(f"Cluster: {cluster_name}")
+            return ' | '.join(parts) if len(parts) > 1 else vm_name
+        
+        if category == 'clusters':
+            cluster_name = item.get('name', '')
+            cluster_type = item.get('type', {})
+            type_name = cluster_type.get('name', '') if isinstance(cluster_type, dict) else ''
+            vm_count = item.get('virtual_machine_count', 0)
+            
+            parts = [cluster_name]
+            if type_name:
+                parts.append(f"Type: {type_name}")
+            if vm_count:
+                parts.append(f"{vm_count} VMs")
+            return ' | '.join(parts) if len(parts) > 1 else cluster_name
+        
+        if category == 'sites':
+            site_name = item.get('name', '')
+            site_status = item.get('status', {})
+            status_label = site_status.get('label', '') if isinstance(site_status, dict) else ''
+            
+            if status_label:
+                return f"{site_name} ({status_label})"
+            return site_name
+        
+        if category == 'tenants':
+            tenant_name = item.get('name', '')
+            device_count = item.get('device_count', 0)
+            vm_count = item.get('virtualmachine_count', 0)
+            
+            parts = [tenant_name]
+            counts = []
+            if device_count:
+                counts.append(f"{device_count} devices")
+            if vm_count:
+                counts.append(f"{vm_count} VMs")
+            if counts:
+                parts.append(', '.join(counts))
+            return ' | '.join(parts) if len(parts) > 1 else tenant_name
+        
+        if category == 'aggregates':
+            prefix = item.get('prefix', '')
+            rir = item.get('rir', {})
+            rir_name = rir.get('name', '') if isinstance(rir, dict) else ''
+            
+            if rir_name:
+                return f"{prefix} (RIR: {rir_name})"
+            return prefix
+        
+        if category == 'ip_ranges':
+            start_address = item.get('start_address', '')
+            end_address = item.get('end_address', '')
+            description = item.get('description', '')
+            
+            if start_address and end_address:
+                range_str = f"{start_address} - {end_address}"
+                if description:
+                    return f"{range_str} ({description})"
+                return range_str
+            return description or 'IP Range'
+        
+        if category == 'contacts':
+            contact_name = item.get('name', '')
+            email = item.get('email', '')
+            
+            if contact_name and email:
+                return f"{contact_name} <{email}>"
+            return contact_name or email or 'Contact'
+        
+        if category == 'services':
+            # NetBox services (not CheckMK which has 'extensions' field)
+            # Use display field if available (e.g., "SSH (TCP/22)")
+            display = item.get('display', '')
+            if display:
+                return display
+            
+            # Fallback to building from components
+            service_name = item.get('name', '')
+            protocol = item.get('protocol', {})
+            protocol_label = protocol.get('label', '') if isinstance(protocol, dict) else ''
+            ports = item.get('ports', [])
+            
+            if service_name:
+                parts = [service_name]
+                if protocol_label and ports:
+                    ports_str = ', '.join(map(str, ports))
+                    parts.append(f"({protocol_label}/{ports_str})")
+                elif protocol_label:
+                    parts.append(f"({protocol_label})")
+                elif ports:
+                    ports_str = ', '.join(map(str, ports))
+                    parts.append(f"(Ports: {ports_str})")
+                return ' '.join(parts)
+            
+            # Last resort - return ID
+            return f"Service {item.get('id', 'Unknown')}"
         
         name = item.get('name')
         if name:

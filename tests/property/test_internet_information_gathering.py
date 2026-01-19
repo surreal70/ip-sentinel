@@ -10,7 +10,7 @@ from hypothesis import given, strategies as st, assume, settings
 from ipaddress import IPv4Address, IPv6Address
 from typing import Union
 
-from src.ip_mana.modules.internet_info import InternetInfoModule
+from src.ip_sentinel.modules.internet_info import InternetInfoModule
 
 # Type alias for IP addresses
 IPAddress = Union[IPv4Address, IPv6Address]
