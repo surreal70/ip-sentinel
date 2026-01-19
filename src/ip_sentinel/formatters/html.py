@@ -452,14 +452,27 @@ class HTMLFormatter(OutputFormatter):
 
         # Group certificates by their content to deduplicate
         cert_groups = {}
+        port_specific_data = {}  # Track port-specific cipher suites and vulnerabilities
+        
         for ssl_result in ssl_results:
             port = ssl_result.get('port', 'Unknown')
             certificate = ssl_result.get('certificate')
+            cipher_suites = ssl_result.get('cipher_suites', [])
+            vulnerabilities = ssl_result.get('vulnerabilities', [])
+            
+            # Store port-specific data
+            port_specific_data[port] = {
+                'cipher_suites': cipher_suites,
+                'vulnerabilities': vulnerabilities
+            }
             
             if certificate and isinstance(certificate, dict):
                 # Check if this is a reference to another port
                 if 'reference_to_port' in certificate:
-                    continue  # Skip references, we'll handle them in the main cert
+                    # Track this port but link it to the primary certificate
+                    ref_port = certificate.get('reference_to_port')
+                    # We'll handle this when displaying the primary certificate
+                    continue
                 
                 # Create a key based on certificate content
                 cert_key = (
@@ -473,8 +486,8 @@ class HTMLFormatter(OutputFormatter):
                     cert_groups[cert_key] = {
                         'certificate': certificate,
                         'ports': [],
-                        'cipher_suites': ssl_result.get('cipher_suites', []),
-                        'vulnerabilities': ssl_result.get('vulnerabilities', [])
+                        'cipher_suites': cipher_suites,
+                        'vulnerabilities': vulnerabilities
                     }
                 
                 cert_groups[cert_key]['ports'].append(port)
@@ -483,11 +496,14 @@ class HTMLFormatter(OutputFormatter):
         for cert_info in cert_groups.values():
             certificate = cert_info['certificate']
             ports = cert_info['ports']
+            
+            # Check if certificate has shared_across_ports info from deduplication
+            shared_ports = certificate.get('shared_across_ports', ports)
             cipher_suites = cert_info['cipher_suites']
             vulnerabilities = cert_info['vulnerabilities']
             
             # Certificate header with ports
-            ports_str = ', '.join(map(str, sorted(ports)))
+            ports_str = ', '.join(map(str, sorted(shared_ports)))
             html_parts.append('<div class="nested-section">')
             html_parts.append(f'<div class="nested-title">Certificate (Ports: {html.escape(ports_str)})</div>')
             
@@ -529,31 +545,72 @@ class HTMLFormatter(OutputFormatter):
             
             html_parts.append('</tbody></table>')
             
-            # Cipher suites
-            if cipher_suites:
+            # If certificate is shared across multiple ports, show per-port details
+            if len(shared_ports) > 1:
                 html_parts.append('<div class="key-value" style="margin-top: 10px;">')
-                html_parts.append(f'<span class="key">Cipher Suites:</span> <span class="value">{len(cipher_suites)} supported</span>')
-                html_parts.append('<ul style="margin-top: 5px;">')
-                for cipher in cipher_suites[:5]:  # Show first 5
-                    html_parts.append(f'<li style="color: #007acc;">{html.escape(cipher)}</li>')
-                if len(cipher_suites) > 5:
-                    html_parts.append(f'<li style="font-style: italic; color: #6c757d;">... and {len(cipher_suites) - 5} more</li>')
-                html_parts.append('</ul>')
+                html_parts.append('<span class="key">Port-Specific Details:</span>')
                 html_parts.append('</div>')
-            
-            # Vulnerabilities
-            if vulnerabilities:
-                html_parts.append('<div class="key-value" style="margin-top: 10px;">')
-                html_parts.append(f'<span class="key" style="color: #dc3545;">Vulnerabilities:</span> <span class="value" style="color: #dc3545; font-weight: bold;">{len(vulnerabilities)} found</span>')
-                html_parts.append('<ul style="margin-top: 5px;">')
-                for vuln in vulnerabilities:
-                    html_parts.append(f'<li style="color: #dc3545;">{html.escape(vuln)}</li>')
-                html_parts.append('</ul>')
-                html_parts.append('</div>')
+                
+                for port in sorted(shared_ports):
+                    port_data = port_specific_data.get(port, {})
+                    port_cipher_suites = port_data.get('cipher_suites', [])
+                    port_vulnerabilities = port_data.get('vulnerabilities', [])
+                    
+                    html_parts.append('<div style="margin-left: 20px; margin-top: 10px; padding: 10px; background: #f8f9fa; border-left: 3px solid #007acc;">')
+                    html_parts.append(f'<div style="font-weight: bold; color: #007acc; margin-bottom: 5px;">Port {port}</div>')
+                    
+                    # Cipher suites for this port
+                    if port_cipher_suites:
+                        html_parts.append('<div class="key-value">')
+                        html_parts.append(f'<span class="key">Cipher Suites:</span> <span class="value">{len(port_cipher_suites)} supported</span>')
+                        html_parts.append('<ul style="margin-top: 5px; margin-bottom: 5px;">')
+                        # Show ALL cipher suites for each port
+                        for cipher in port_cipher_suites:
+                            html_parts.append(f'<li style="color: #007acc; font-size: 0.9em;">{html.escape(cipher)}</li>')
+                        html_parts.append('</ul>')
+                        html_parts.append('</div>')
+                    
+                    # Vulnerabilities for this port
+                    if port_vulnerabilities:
+                        html_parts.append('<div class="key-value">')
+                        html_parts.append(f'<span class="key" style="color: #dc3545;">Vulnerabilities:</span> <span class="value" style="color: #dc3545; font-weight: bold;">{len(port_vulnerabilities)} found</span>')
+                        html_parts.append('<ul style="margin-top: 5px; margin-bottom: 5px;">')
+                        for vuln in port_vulnerabilities:
+                            html_parts.append(f'<li style="color: #dc3545; font-size: 0.9em;">{html.escape(vuln)}</li>')
+                        html_parts.append('</ul>')
+                        html_parts.append('</div>')
+                    else:
+                        html_parts.append('<div class="key-value">')
+                        html_parts.append('<span class="key">Vulnerabilities:</span> <span class="value" style="color: #28a745;">✓ None detected</span>')
+                        html_parts.append('</div>')
+                    
+                    html_parts.append('</div>')
             else:
-                html_parts.append('<div class="key-value" style="margin-top: 10px;">')
-                html_parts.append('<span class="key">Vulnerabilities:</span> <span class="value" style="color: #28a745;">✓ None detected</span>')
-                html_parts.append('</div>')
+                # Single port - show cipher suites and vulnerabilities directly
+                # Cipher suites - show ALL of them
+                if cipher_suites:
+                    html_parts.append('<div class="key-value" style="margin-top: 10px;">')
+                    html_parts.append(f'<span class="key">Cipher Suites:</span> <span class="value">{len(cipher_suites)} supported</span>')
+                    html_parts.append('<ul style="margin-top: 5px;">')
+                    # Show ALL cipher suites instead of limiting to 5
+                    for cipher in cipher_suites:
+                        html_parts.append(f'<li style="color: #007acc;">{html.escape(cipher)}</li>')
+                    html_parts.append('</ul>')
+                    html_parts.append('</div>')
+                
+                # Vulnerabilities
+                if vulnerabilities:
+                    html_parts.append('<div class="key-value" style="margin-top: 10px;">')
+                    html_parts.append(f'<span class="key" style="color: #dc3545;">Vulnerabilities:</span> <span class="value" style="color: #dc3545; font-weight: bold;">{len(vulnerabilities)} found</span>')
+                    html_parts.append('<ul style="margin-top: 5px;">')
+                    for vuln in vulnerabilities:
+                        html_parts.append(f'<li style="color: #dc3545;">{html.escape(vuln)}</li>')
+                    html_parts.append('</ul>')
+                    html_parts.append('</div>')
+                else:
+                    html_parts.append('<div class="key-value" style="margin-top: 10px;">')
+                    html_parts.append('<span class="key">Vulnerabilities:</span> <span class="value" style="color: #28a745;">✓ None detected</span>')
+                    html_parts.append('</div>')
             
             html_parts.append('</div>')  # Close nested-section
 
