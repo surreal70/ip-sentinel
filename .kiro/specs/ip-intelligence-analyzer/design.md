@@ -12,12 +12,12 @@ The application follows a layered architecture with clear separation of concerns
 ┌─────────────────────────────────────────────────────────────┐
 │                    CLI Interface Layer                      │
 ├─────────────────────────────────────────────────────────────┤
-│                  Application Controller                     │
+│         Application Controller  │  Batch Processor          │
 ├─────────────────────────────────────────────────────────────┤
 │  Module 1    │  Module 2    │  Module 3    │  Module 4     │
 │ Classification│ Local Info   │ Internet Info│ App Integration│
 ├─────────────────────────────────────────────────────────────┤
-│           Output Formatter    │    Database Layer           │
+│  Output Formatter  │  Database Layer  │  Progress Tracker  │
 ├─────────────────────────────────────────────────────────────┤
 │              Core Libraries & External APIs                 │
 └─────────────────────────────────────────────────────────────┘
@@ -30,6 +30,8 @@ The application follows a layered architecture with clear separation of concerns
 - **Separation of Concerns**: Clear boundaries between data collection, processing, and presentation
 - **Extensibility**: New modules and output formats can be added without core changes
 - **Error Isolation**: Module failures don't affect other modules
+- **Batch Processing**: Support for both sequential and parallel processing of multiple IPs
+- **Progress Tracking**: Real-time feedback for long-running batch operations
 
 ## Components and Interfaces
 
@@ -187,6 +189,60 @@ class OutputFormatter:
     def set_verbosity(self, mode: VerbosityMode)
 ```
 
+### Batch Processing Components
+
+#### Batch Processor (`BatchProcessor`)
+- **Purpose**: Manages batch analysis of multiple IP addresses from CIDR networks
+- **Libraries**: Python's `ipaddress` module for CIDR expansion, `concurrent.futures` for parallel processing
+- **Features**:
+  - CIDR network expansion with 1024 IP limit validation
+  - Sequential and parallel processing modes
+  - Progress tracking with overall and per-IP indicators
+  - Output file management with sanitized filenames
+
+```python
+class BatchProcessor:
+    def __init__(self, analyzer: IPAnalyzer, output_folder: str, parallel: bool = False)
+    def process_cidr(self, cidr: str) -> BatchResult
+    def expand_cidr(self, cidr: str) -> List[IPAddress]
+    def validate_batch_size(self, ip_list: List[IPAddress]) -> bool
+    def process_ip_list(self, ip_list: List[IPAddress]) -> BatchResult
+    def sanitize_filename(self, ip: IPAddress) -> str
+```
+
+#### Progress Tracker (`ProgressTracker`)
+- **Purpose**: Provides real-time progress feedback for batch operations
+- **Features**:
+  - Overall progress indicator (current IP / total IPs)
+  - Per-IP sub-progress for analysis stages
+  - Thread-safe progress updates for parallel processing
+  - Console-based progress bars
+
+```python
+class ProgressTracker:
+    def __init__(self, total_ips: int, parallel: bool = False)
+    def update_overall_progress(self, current: int)
+    def update_sub_progress(self, ip: IPAddress, stage: str, progress: float)
+    def display_progress(self)
+```
+
+#### File Output Manager (`FileOutputManager`)
+- **Purpose**: Manages file creation and organization for batch results
+- **Features**:
+  - Output folder creation and validation
+  - Filename sanitization for filesystem compatibility
+  - File writing with proper error handling
+  - Support for JSON and HTML output formats
+
+```python
+class FileOutputManager:
+    def __init__(self, output_folder: str, format_type: str)
+    def create_output_folder(self)
+    def generate_filename(self, ip: IPAddress) -> str
+    def write_result(self, ip: IPAddress, content: str)
+    def validate_output_folder(self) -> bool
+```
+
 ## Data Models
 
 ### Core Data Structures
@@ -234,6 +290,17 @@ class SSLResult:
     certificate: Optional[Certificate]
     cipher_suites: List[str]
     vulnerabilities: List[str]
+
+@dataclass
+class BatchResult:
+    total_ips: int
+    successful: int
+    failed: int
+    start_time: datetime
+    end_time: datetime
+    results: Dict[str, AnalysisResult]
+    errors: Dict[str, str]  # IP -> error message
+    output_files: List[str]
 ```
 
 ### Database Schema
@@ -361,6 +428,34 @@ CREATE TABLE classifications (
 *For any* configuration file provided to the application, the settings should be properly loaded and applied as defaults, with command-line options taking precedence over file settings.
 **Validates: Requirements 10.7**
 
+### Property 23: Batch Mode Output Format Restriction
+*For any* batch mode execution, the application should only proceed when either JSON or HTML output format is specified, rejecting execution with human-readable format.
+**Validates: Requirements 11.2, 11.3**
+
+### Property 24: CIDR Expansion Accuracy
+*For any* valid CIDR network notation, the batch processor should correctly expand it to the exact set of individual IP addresses within that network range.
+**Validates: Requirements 11.4, 11.5**
+
+### Property 25: Batch Size Limit Enforcement
+*For any* CIDR network that expands to more than 1024 IP addresses, the application should reject the batch execution with a clear error message before processing begins.
+**Validates: Requirements 11.6, 11.7**
+
+### Property 26: Output Folder Management
+*For any* specified output folder in batch mode, the application should create the folder if it doesn't exist and successfully write all output files to that location.
+**Validates: Requirements 11.8, 11.9, 11.10**
+
+### Property 27: Filename Sanitization
+*For any* IP address in batch mode, the generated output filename should be based on the IP address with all characters sanitized for filesystem compatibility across different operating systems.
+**Validates: Requirements 11.16**
+
+### Property 28: Progress Indicator Accuracy
+*For any* batch processing operation, the overall progress indicator should accurately reflect the current IP number and total count, updating after each IP is processed.
+**Validates: Requirements 11.11**
+
+### Property 29: Parallel Processing Thread Safety
+*For any* batch mode execution with parallel processing enabled, all progress indicators and file operations should remain thread-safe without data corruption or race conditions.
+**Validates: Requirements 11.13, 11.14, 11.15**
+
 ## Error Handling
 
 ### Error Categories and Strategies
@@ -392,6 +487,54 @@ CREATE TABLE classifications (
 - **Retry Logic**: Configurable retry attempts for transient failures
 - **Fallback Methods**: Alternative approaches when primary methods fail
 - **Error Aggregation**: Collect and report all errors at the end of analysis
+
+## Batch Processing Workflow
+
+### Sequential Processing Mode
+
+1. **Input Validation**: Validate CIDR notation and output format requirements
+2. **CIDR Expansion**: Expand CIDR to individual IP addresses
+3. **Size Validation**: Ensure IP count doesn't exceed 1024 limit
+4. **Folder Setup**: Create output folder if it doesn't exist
+5. **Sequential Analysis**: Process each IP one at a time
+   - Update overall progress indicator
+   - Display sub-progress for current IP analysis stages
+   - Generate output file for each IP
+   - Store results in database
+6. **Summary Report**: Display batch completion statistics
+
+### Parallel Processing Mode
+
+1. **Input Validation**: Same as sequential mode
+2. **CIDR Expansion**: Same as sequential mode
+3. **Size Validation**: Same as sequential mode
+4. **Folder Setup**: Same as sequential mode
+5. **Thread Pool Creation**: Initialize worker threads based on system resources
+6. **Parallel Analysis**: Process multiple IPs concurrently
+   - Thread-safe progress tracking
+   - Concurrent file writing with locks
+   - Independent error handling per IP
+   - Database writes with transaction management
+7. **Summary Report**: Display batch completion statistics
+
+### Progress Tracking Design
+
+**Overall Progress Indicator**:
+```
+Processing IP 45/256 [===================>          ] 17.6%
+```
+
+**Sub-Progress Indicator** (per IP):
+```
+  192.168.1.45: Classification [====] Module 2 [===>  ] Module 3 [     ]
+```
+
+### Filename Sanitization Rules
+
+- IPv4: Replace dots with underscores (e.g., `192.168.1.1` → `192_168_1_1.json`)
+- IPv6: Replace colons with underscores, compress consecutive underscores (e.g., `2001:db8::1` → `2001_db8__1.json`)
+- Add appropriate extension based on format (`.json` or `.html`)
+- Ensure compatibility with Windows, Linux, and macOS filesystems
 
 ## Python Development Framework Integration
 

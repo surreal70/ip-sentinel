@@ -142,6 +142,23 @@ def create_parser() -> argparse.ArgumentParser:
         help="Disable SSL certificate verification (WARNING: This is insecure and should only be used for testing)",
     )
 
+    # Batch processing options
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Enable batch processing mode for multiple IP addresses from CIDR networks",
+    )
+    parser.add_argument(
+        "--output-folder",
+        type=str,
+        help="Output folder for batch mode results (required with --batch)",
+    )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Enable parallel processing of IP addresses in batch mode",
+    )
+
     return parser
 
 
@@ -217,6 +234,124 @@ def handle_classification_management(args, config_manager: ConfigManager) -> int
     return 0
 
 
+def handle_batch_mode(args, config_manager: ConfigManager) -> int:
+    """
+    Handle batch processing mode.
+
+    Args:
+        args: Parsed command-line arguments
+        config_manager: Configuration manager instance
+
+    Returns:
+        Exit code (0 for success, non-zero for error)
+    """
+    from .batch import BatchProcessor, BatchSizeExceededError, InvalidOutputFormatError, OutputFolderError
+    from .analyzer import IPAnalyzer
+
+    # Validate batch mode requirements
+    # 1. Require --output-folder
+    if not args.output_folder:
+        print("Error: --output-folder is required in batch mode", file=sys.stderr)
+        return 1
+
+    # 2. Require JSON or HTML output format
+    output_format = "human"
+    if args.json:
+        output_format = "json"
+    elif args.html:
+        output_format = "html"
+    elif args.human:
+        output_format = "human"
+
+    if output_format not in ['json', 'html']:
+        print(
+            "Error: Batch mode requires --json or --html output format. "
+            "Human-readable format is not supported in batch mode.",
+            file=sys.stderr
+        )
+        return 1
+
+    # Build configuration
+    config = build_config_from_args(args)
+
+    # Validate IP address is in CIDR notation (contains '/')
+    if '/' not in args.ip_address:
+        print(
+            "Error: Batch mode requires CIDR notation (e.g., 192.168.1.0/24)",
+            file=sys.stderr
+        )
+        return 1
+
+    try:
+        # Initialize analyzer
+        with IPAnalyzer(
+            config=config,
+            config_manager=config_manager,
+            credential_file=args.credentials
+        ) as analyzer:
+
+            # Initialize batch processor
+            batch_processor = BatchProcessor(
+                analyzer=analyzer,
+                output_folder=args.output_folder,
+                format_type=output_format,
+                parallel=args.parallel
+            )
+
+            # Display batch mode information
+            if args.verbose:
+                print(f"IP-Sentinel v{__version__} - Batch Mode")
+                print(f"CIDR Network: {args.ip_address}")
+                print(f"Output Folder: {args.output_folder}")
+                print(f"Output Format: {output_format}")
+                print(f"Parallel Processing: {'Enabled' if args.parallel else 'Disabled'}")
+                print(f"Reporting Mode: {config.reporting_mode}")
+                print("-" * 80)
+
+            # Process CIDR network
+            result = batch_processor.process_cidr(args.ip_address)
+
+            # Display summary
+            print("\n" + "=" * 80)
+            print("Batch Processing Summary")
+            print("=" * 80)
+            print(f"Total IPs Processed: {result.total_ips}")
+            print(f"Successful: {result.successful}")
+            print(f"Failed: {result.failed}")
+            print(f"Duration: {result.duration:.2f} seconds")
+            print(f"Output Files: {len(result.output_files)}")
+            print(f"Output Folder: {args.output_folder}")
+            print("=" * 80)
+
+            # Display errors if any
+            if result.errors:
+                print("\nErrors encountered during batch processing:", file=sys.stderr)
+                for ip_str, error_msg in result.errors.items():
+                    print(f"  {ip_str}: {error_msg}", file=sys.stderr)
+
+            # Return non-zero if any failures occurred
+            return 1 if result.failed > 0 else 0
+
+    except BatchSizeExceededError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except InvalidOutputFormatError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except OutputFolderError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
 def main(args: Optional[List[str]] = None) -> int:
     """Main entry point for the CLI application."""
     parser = create_parser()
@@ -238,6 +373,10 @@ def main(args: Optional[List[str]] = None) -> int:
     # Require IP address for analysis operations
     if not parsed_args.ip_address:
         parser.error("IP address is required for analysis operations")
+
+    # Validate batch mode requirements
+    if parsed_args.batch:
+        return handle_batch_mode(parsed_args, config_manager)
 
     # Build configuration from command-line arguments
     config = build_config_from_args(parsed_args)

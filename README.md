@@ -234,6 +234,249 @@ ip-sentinel --netbox --checkmk --openvas 192.168.1.1
 ip-sentinel --credentials /path/to/credentials.json --netbox 192.168.1.1
 ```
 
+### Batch Processing Mode
+
+IP-Sentinel supports batch processing for analyzing multiple IP addresses from CIDR networks efficiently.
+
+**Basic batch processing** (requires JSON or HTML output):
+```bash
+ip-sentinel --batch --json --output-folder results/ 192.168.1.0/24
+```
+
+**Batch processing with HTML output**:
+```bash
+ip-sentinel --batch --html --output-folder reports/ 10.0.0.0/28
+```
+
+**Parallel batch processing** (faster for large networks):
+```bash
+ip-sentinel --batch --parallel --json --output-folder results/ 192.168.1.0/24
+```
+
+**Batch processing with full reporting mode**:
+```bash
+ip-sentinel --batch --full --json --output-folder detailed/ 172.16.0.0/28
+```
+
+#### Batch Mode Requirements
+
+- **Output Format**: Must specify either `--json` or `--html` (human-readable not supported in batch mode)
+- **Output Folder**: Must specify `--output-folder` for storing individual IP results
+- **CIDR Notation**: Input must be in CIDR format (e.g., `192.168.1.0/24`)
+- **Size Limit**: Maximum 1024 IP addresses per batch (enforced automatically)
+
+#### CIDR Notation Examples
+
+| CIDR | IP Count | Description |
+|------|----------|-------------|
+| `192.168.1.0/32` | 1 | Single IP address |
+| `192.168.1.0/30` | 4 | Small subnet (2 usable IPs) |
+| `192.168.1.0/28` | 16 | Small network segment |
+| `192.168.1.0/24` | 256 | Standard Class C network |
+| `192.168.0.0/22` | 1024 | Maximum allowed batch size |
+| `10.0.0.0/22` | 1024 | Maximum allowed batch size |
+
+**Note**: CIDR ranges larger than /22 (more than 1024 IPs) will be rejected with an error message.
+
+#### Progress Tracking
+
+Batch mode provides real-time progress indicators:
+
+**Overall Progress**:
+```
+Processing IP 45/256 [===================>          ] 17.6%
+```
+
+**Per-IP Sub-Progress** (shows current analysis stage):
+```
+  192.168.1.45: Classification [====] Module 2 [===>  ] Module 3 [     ]
+```
+
+#### Output File Structure
+
+Batch mode creates individual files for each IP address:
+
+**Directory Structure**:
+```
+results/
+├── 192_168_1_1.json
+├── 192_168_1_2.json
+├── 192_168_1_3.json
+├── ...
+└── 192_168_1_254.json
+```
+
+**Filename Sanitization**:
+- IPv4: Dots replaced with underscores (`192.168.1.1` → `192_168_1_1.json`)
+- IPv6: Colons replaced with underscores (`2001:db8::1` → `2001_db8__1.json`)
+- Extension: `.json` or `.html` based on output format
+
+#### Parallel Processing
+
+Parallel mode processes multiple IPs concurrently for better performance:
+
+**Benefits**:
+- Significantly faster for large networks
+- Utilizes multiple CPU cores
+- Maintains thread-safe progress tracking
+
+**Considerations**:
+- Higher CPU and memory usage
+- More network connections simultaneously
+- May trigger rate limits on external APIs
+
+**Recommended Use Cases**:
+- Large networks (100+ IPs)
+- Fast local networks
+- Systems with multiple CPU cores
+- When external API rate limits are not a concern
+
+**When to Use Sequential Mode**:
+- Small networks (< 50 IPs)
+- Limited system resources
+- External API rate limits are a concern
+- Debugging or troubleshooting
+
+#### Performance Considerations
+
+**Sequential Processing**:
+- **Speed**: ~5-30 seconds per IP (depending on modules)
+- **Memory**: Low (~50-100 MB)
+- **Network**: One connection at a time
+- **Best for**: Small batches, rate-limited APIs
+
+**Parallel Processing**:
+- **Speed**: ~2-10x faster (depends on CPU cores)
+- **Memory**: Medium (~200-500 MB)
+- **Network**: Multiple concurrent connections
+- **Best for**: Large batches, local networks
+
+**Estimated Processing Times** (256 IPs, all modules):
+- Sequential: ~30-60 minutes
+- Parallel (4 cores): ~10-20 minutes
+- Parallel (8 cores): ~5-15 minutes
+
+#### Batch Processing Examples
+
+**Analyze a small subnet with all details**:
+```bash
+ip-sentinel --batch --full --json --output-folder subnet_scan/ 192.168.1.0/28
+```
+
+**Fast parallel scan of a Class C network**:
+```bash
+ip-sentinel --batch --parallel --dense --json --output-folder fast_scan/ 192.168.1.0/24
+```
+
+**Scan with application modules**:
+```bash
+ip-sentinel --batch --json --output-folder netbox_scan/ --netbox 10.0.0.0/26
+```
+
+**Maximum size batch with parallel processing**:
+```bash
+ip-sentinel --batch --parallel --json --output-folder large_scan/ 172.16.0.0/22
+```
+
+**Batch scan with custom database location**:
+```bash
+ip-sentinel --batch --json --output-folder results/ --database /var/db/scans.db 192.168.1.0/24
+```
+
+#### Batch Processing Script Examples
+
+IP-Sentinel includes several ready-to-use batch processing scripts in the `examples/` directory:
+
+1. **Simple Batch Scan** (`examples/batch_scan_simple.sh`)
+   - Basic single network scanning
+   - Sequential processing
+   - Good for learning and small networks
+
+2. **Parallel Batch Scan** (`examples/batch_scan_parallel.sh`)
+   - Fast parallel processing
+   - Configurable reporting modes
+   - Ideal for large networks
+
+3. **Multiple Networks Scan** (`examples/batch_scan_multiple_networks.sh`)
+   - Scan multiple networks in one run
+   - Organized output structure
+   - Centralized database
+   - Comprehensive summary reports
+
+4. **Scan with Application Modules** (`examples/batch_scan_with_modules.sh`)
+   - Enterprise integration (NetBox, CheckMK, OpenVAS)
+   - Custom credentials support
+   - Full reporting mode
+
+5. **HTML Report Generation** (`examples/batch_scan_html_report.sh`)
+   - Generates styled HTML reports
+   - Creates index page for easy browsing
+   - Professional presentation
+
+**Quick Start:**
+```bash
+# Make scripts executable
+chmod +x examples/*.sh
+
+# Run a simple scan
+./examples/batch_scan_simple.sh
+
+# Run a parallel scan
+./examples/batch_scan_parallel.sh
+
+# Scan multiple networks
+./examples/batch_scan_multiple_networks.sh
+```
+
+**Customization:**
+Each script has a configuration section at the top. Edit these variables to customize:
+- Network ranges (CIDR notation)
+- Output locations
+- Output formats (JSON/HTML)
+- Processing modes (sequential/parallel)
+- Reporting verbosity (dense/full/full-err)
+
+For detailed documentation on each example script, see [`examples/README.md`](examples/README.md).
+
+#### Batch Mode Error Handling
+
+**Common Errors**:
+
+1. **Missing output format**:
+```
+Error: Batch mode requires --json or --html output format
+```
+Solution: Add `--json` or `--html` flag
+
+2. **Missing output folder**:
+```
+Error: Batch mode requires --output-folder parameter
+```
+Solution: Add `--output-folder /path/to/folder`
+
+3. **Batch size exceeded**:
+```
+Error: CIDR 10.0.0.0/20 expands to 4096 IPs, exceeding limit of 1024
+```
+Solution: Use smaller CIDR range (e.g., split into multiple /22 networks)
+
+4. **Invalid CIDR notation**:
+```
+Error: Invalid CIDR notation: 192.168.1.0/33
+```
+Solution: Use valid CIDR notation (IPv4: /0-/32, IPv6: /0-/128)
+
+#### Batch Processing Best Practices
+
+1. **Start Small**: Test with small subnets first (e.g., /28 or /27)
+2. **Monitor Resources**: Watch CPU, memory, and network usage
+3. **Use Appropriate Mode**: Sequential for small batches, parallel for large
+4. **Check Permissions**: Ensure write access to output folder
+5. **Database Location**: Use dedicated database for large scans
+6. **Rate Limits**: Be aware of external API rate limits (Module 3)
+7. **Network Policies**: Ensure scanning is authorized on target networks
+8. **Disk Space**: Ensure sufficient space for output files (JSON: ~10-50 KB per IP)
+
 ### Classification Management
 
 **Add a custom classification**:
@@ -369,7 +612,7 @@ The project uses a dual testing approach:
 
 ![Pytest](https://img.shields.io/badge/testing-pytest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
 ![Hypothesis](https://img.shields.io/badge/PBT-hypothesis-orange?style=flat-square)
-![Coverage](https://img.shields.io/badge/coverage-232_tests-success?style=flat-square)
+![Coverage](https://img.shields.io/badge/coverage-390_tests-success?style=flat-square)
 
 **Run all tests**:
 ```bash
@@ -411,6 +654,7 @@ ip-intelligence-analyzer/
 │   ├── __init__.py
 │   ├── cli.py                # Command-line interface
 │   ├── analyzer.py           # Main controller
+│   ├── batch.py              # Batch processing
 │   ├── ip_handler.py         # IP address handling
 │   ├── config.py             # Configuration management
 │   ├── modules/              # Analysis modules
@@ -429,6 +673,13 @@ ip-intelligence-analyzer/
 │   ├── unit/                 # Unit tests
 │   ├── property/             # Property-based tests
 │   └── integration/          # Integration tests
+├── examples/                 # Batch processing examples
+│   ├── README.md             # Examples documentation
+│   ├── batch_scan_simple.sh
+│   ├── batch_scan_parallel.sh
+│   ├── batch_scan_multiple_networks.sh
+│   ├── batch_scan_with_modules.sh
+│   └── batch_scan_html_report.sh
 ├── docs/                     # Documentation
 │   ├── LICENSE_ANALYSIS.md   # License compatibility analysis
 │   └── LICENSE_RECOMMENDATION.md
@@ -649,16 +900,20 @@ We welcome contributions! Please follow these guidelines:
 
 ## Roadmap
 
-### 🎯 Current Version (0.3.1)
+### 🎯 Current Version (0.5.2)
 - ✅ Core modules 1-3 implemented
 - ✅ Application module with NetBox, CheckMK, OpenVAS
-- ✅ Multiple output formats
-- ✅ Property-based testing
-- ✅ Comprehensive documentation
+- ✅ Multiple output formats (Human, JSON, HTML)
+- ✅ Batch processing mode with CIDR support
+- ✅ Parallel processing for large networks
+- ✅ Progress tracking for batch operations
+- ✅ Property-based testing (132 tests)
+- ✅ Comprehensive documentation and examples
 
 ### 🚀 Planned Features
 - [ ] OpenITCockpit submodule (Module 4)
 - [ ] Infoblox submodule (Module 4)
+- [ ] OpenVAS GMP protocol support (refactor from REST API)
 - [ ] Web interface
 - [ ] REST API
 - [ ] Scheduled scanning

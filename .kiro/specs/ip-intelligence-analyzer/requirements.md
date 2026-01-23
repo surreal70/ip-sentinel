@@ -2,11 +2,11 @@
 
 ## Introduction
 
-IP-Sentinel is a Python console application that gathers comprehensive intelligence about IP addresses through multiple analysis modules. The system provides flexible output formats, persistent storage, and modular architecture for both local and internet-based information gathering.
+IP-ManA is a Python console application that gathers comprehensive intelligence about IP addresses through multiple analysis modules. The system provides flexible output formats, persistent storage, and modular architecture for both local and internet-based information gathering.
 
 ## Glossary
 
-- **IP-Sentinel**: IP Management and Analysis application
+- **IP-Man**: IP Management and Analysis application
 - **Classification_Module**: Module that categorizes IP addresses based on RFC-defined ranges
 - **Local_Info_Module**: Module that gathers information from the local network environment
 - **Internet_Info_Module**: Module that queries external services for IP intelligence
@@ -17,6 +17,11 @@ IP-Sentinel is a Python console application that gathers comprehensive intellige
 - **Dense_Mode**: Reporting mode showing only collected data
 - **Full_Mode**: Reporting mode showing all tests including empty results
 - **Full_Error_Mode**: Reporting mode including error details and timeout information
+- **Batch_Mode**: Processing mode for analyzing multiple IP addresses from CIDR networks
+- **Batch_Processor**: Component that manages batch analysis of multiple IP addresses
+- **CIDR_Notation**: Classless Inter-Domain Routing notation for specifying IP network ranges
+- **Progress_Tracker**: Component that displays real-time progress for batch operations
+- **Parallel_Processing**: Concurrent processing of multiple IP addresses using multiple threads
 
 ## Requirements
 
@@ -163,3 +168,26 @@ IP-Sentinel is a Python console application that gathers comprehensive intellige
 5. THE Application SHALL support verbose output mode for debugging
 6. THE Application SHALL provide version information via --version option
 7. THE Application SHALL support configuration file for default settings
+
+### Requirement 11: Batch Processing Mode
+
+**User Story:** Als Benutzer möchte ich mehrere IP-Adressen in einem Batch-Modus verarbeiten, damit ich große Netzwerke effizient analysieren kann.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide --batch command-line option to enable batch processing mode
+2. WHEN batch mode is enabled, THE Application SHALL require either --json or --html output format
+3. WHEN batch mode is enabled without --json or --html, THE Application SHALL reject execution with clear error message
+4. THE Application SHALL accept CIDR network notation as input in batch mode
+5. WHEN CIDR notation is provided, THE Application SHALL expand it to individual IP addresses
+6. THE Application SHALL enforce maximum limit of 1024 IP addresses per batch run
+7. WHEN CIDR expansion exceeds 1024 addresses, THE Application SHALL reject execution with clear error message
+8. THE Application SHALL require --output-folder parameter in batch mode
+9. WHEN --output-folder is specified, THE Application SHALL create the folder if it does not exist
+10. THE Application SHALL generate separate output files for each IP address in the specified folder
+11. THE Application SHALL display overall progress indicator showing current IP address number and total count
+12. THE Application SHALL display sub-progress indicator for individual IP address processing stages
+13. THE Application SHALL provide --parallel option to enable parallel processing of IP addresses
+14. WHEN --parallel is enabled, THE Application SHALL process multiple IP addresses concurrently
+15. WHEN --parallel is enabled, THE Application SHALL maintain thread-safe progress indicators
+16. THE Application SHALL generate output filenames based on IP address (sanitized for filesystem compatibility)

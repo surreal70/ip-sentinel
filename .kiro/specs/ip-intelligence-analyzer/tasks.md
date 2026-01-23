@@ -250,6 +250,22 @@ This implementation plan follows the Python development framework standards and 
   - Use test IP addresses: 192.168.143.55, 192.168.143.1, 192.168.141.15, 80.152.228.15, 167.235.220.72
   - _Requirements: 9.5_
 
+- [ ]* 16.2 Test OpenVAS integration and outputs (POSTPONED FOR LATER RELEASE)
+  - NOTE: OpenVAS integration requires GMP (Greenbone Management Protocol) implementation
+  - Current implementation uses REST API which doesn't exist in OpenVAS/Greenbone
+  - Requires refactoring to use python-gvm library and GMP protocol
+  - Postponed to future release due to complexity and server configuration requirements
+  - Perform live integration testing with OpenVAS API using configured credentials
+  - Test vulnerability data retrieval and formatting for all output formats (human, JSON, HTML)
+  - Verify OpenVAS results are properly integrated into main analysis output
+  - Test with multiple IP addresses to validate consistency
+  - Verify error handling when OpenVAS is unavailable or returns errors
+  - Validate that vulnerability severity levels are correctly displayed
+  - Test scan history and report retrieval functionality
+  - Ensure CVE information and threat intelligence data are properly formatted
+  - Use test IP addresses: 192.168.143.55, 192.168.143.1, 192.168.141.15, 80.152.228.15, 167.235.220.72
+  - _Requirements: 9.5, 2.1, 2.2, 2.3, 2.5_
+
 - [ ]* 17. Implement OpenITCockpit submodule for IT management integration (PLANNED FOR LATER RELEASE)
   - Enhance OpenITCockpit submodule with comprehensive IT management queries
   - Implement host and service information retrieval
@@ -540,6 +556,129 @@ This implementation plan follows the Python development framework standards and 
   - Run full test suite to confirm no regressions
   - Test HTML output with various IP addresses and scenarios
   - Validate that ip-sentinel command works correctly
+  - Ask the user if questions arise.
+
+- [x] 28.1 Checkpoint - Review batch mode specification
+  - Review new Requirement 11: Batch Processing Mode with 16 acceptance criteria
+  - Review batch mode design components (BatchProcessor, ProgressTracker, FileOutputManager)
+  - Review 7 new correctness properties (Properties 23-29) for batch mode
+  - Confirm understanding of CIDR expansion and 1024 IP limit
+  - Confirm understanding of parallel processing requirements
+  - Confirm understanding of progress tracking requirements
+  - Ask the user if questions arise or if any clarifications are needed before implementation.
+
+- [x] 29. Implement batch processing infrastructure
+  - Create BatchProcessor class for managing multiple IP address analysis
+  - Implement CIDR network expansion using ipaddress module
+  - Add batch size validation (1024 IP limit enforcement)
+  - Create FileOutputManager for handling batch output files
+  - Implement filename sanitization for cross-platform compatibility
+  - Add batch mode validation (requires JSON or HTML output format)
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.16_
+
+- [x] 29.1 Write property test for batch mode output format restriction
+  - **Property 23: Batch Mode Output Format Restriction**
+  - **Validates: Requirements 11.2, 11.3**
+
+- [x] 29.2 Write property test for CIDR expansion accuracy
+  - **Property 24: CIDR Expansion Accuracy**
+  - **Validates: Requirements 11.4, 11.5**
+
+- [x] 29.3 Write property test for batch size limit enforcement
+  - **Property 25: Batch Size Limit Enforcement**
+  - **Validates: Requirements 11.6, 11.7**
+
+- [x] 29.4 Write property test for output folder management
+  - **Property 26: Output Folder Management**
+  - **Validates: Requirements 11.8, 11.9, 11.10**
+
+- [x] 29.5 Write property test for filename sanitization
+  - **Property 27: Filename Sanitization**
+  - **Validates: Requirements 11.16**
+
+- [x] 30. Implement progress tracking system
+  - Create ProgressTracker class for batch operation feedback
+  - Implement overall progress indicator (current IP / total IPs)
+  - Add sub-progress tracking for individual IP analysis stages
+  - Create console-based progress bar display
+  - Add progress update methods for different analysis stages
+  - Ensure progress display updates in real-time
+  - _Requirements: 11.11, 11.12_
+
+- [x] 30.1 Write property test for progress indicator accuracy
+  - **Property 28: Progress Indicator Accuracy**
+  - **Validates: Requirements 11.11**
+
+- [x] 30.2 Write unit tests for progress tracking
+  - Test progress bar rendering and updates
+  - Test sub-progress stage transitions
+  - Test progress accuracy with various batch sizes
+  - _Requirements: 11.11, 11.12_
+
+- [x] 31. Implement parallel processing support
+  - Add parallel processing option using concurrent.futures ThreadPoolExecutor
+  - Implement thread-safe progress tracking with locks
+  - Add thread-safe file writing operations
+  - Implement concurrent database writes with transaction management
+  - Add worker thread pool management based on system resources
+  - Ensure proper error isolation between parallel workers
+  - _Requirements: 11.13, 11.14, 11.15_
+
+- [x] 31.1 Write property test for parallel processing thread safety
+  - **Property 29: Parallel Processing Thread Safety**
+  - **Validates: Requirements 11.13, 11.14, 11.15**
+
+- [x] 31.2 Write unit tests for parallel processing
+  - Test concurrent IP processing with multiple threads
+  - Test thread-safe progress updates
+  - Test file writing without race conditions
+  - Test error handling in parallel mode
+  - _Requirements: 11.13, 11.14, 11.15_
+
+- [x] 32. Integrate batch mode into CLI and main application
+  - Add --batch command-line flag to CLI argument parser
+  - Add --output-folder parameter for batch mode
+  - Add --parallel flag for enabling parallel processing
+  - Implement batch mode validation in CLI (requires JSON/HTML format)
+  - Wire BatchProcessor into main application controller
+  - Add batch mode help documentation
+  - Update error messages for batch mode specific errors
+  - _Requirements: 11.1, 11.2, 11.3, 11.8, 11.13_
+
+- [x] 32.1 Write integration tests for batch mode
+  - Test batch mode with small CIDR networks (e.g., /29, /28)
+  - Test batch mode with maximum allowed size (1024 IPs)
+  - Test batch mode rejection when exceeding 1024 IP limit
+  - Test batch mode with JSON output format
+  - Test batch mode with HTML output format
+  - Test batch mode rejection with human-readable format
+  - Test output folder creation and file generation
+  - Test filename sanitization for IPv4 and IPv6 addresses
+  - _Requirements: All batch mode requirements_
+
+- [x] 32.2 Write integration tests for parallel batch mode
+  - Test parallel processing with multiple IPs
+  - Test progress tracking in parallel mode
+  - Test file output consistency in parallel mode
+  - Test error handling when some IPs fail in parallel mode
+  - Verify no race conditions or data corruption
+  - _Requirements: 11.13, 11.14, 11.15_
+
+- [x] 33. Add batch mode documentation and examples
+  - Document batch mode usage in README
+  - Add examples of CIDR notation usage
+  - Document parallel processing recommendations
+  - Add performance considerations for large batches
+  - Document output folder structure and file naming
+  - Create example batch processing scripts
+  - _Requirements: Documentation and usability_
+
+- [x] 34. Checkpoint - Batch mode validation
+  - Ensure all batch mode tests pass
+  - Verify CIDR expansion works correctly for various network sizes
+  - Test progress indicators display properly
+  - Validate parallel processing performance and thread safety
+  - Test with real-world CIDR networks
   - Ask the user if questions arise.
 
 ## Notes
