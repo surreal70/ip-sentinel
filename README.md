@@ -924,25 +924,43 @@ We welcome contributions! Please follow these guidelines:
 ## ❓ Frequently Asked Questions
 
 **Q: Do I need root privileges to run IP-Sentinel?**
-A: No, but some nmap features in Module 2 require root/administrator privileges.
+A: No, but some nmap features in Module 2 require root/administrator privileges for OS detection and certain port scans. Use the `--run-root` flag to enable these features.
 
 **Q: Can I analyze multiple IPs at once?**
-A: Currently, one IP per invocation. Use shell scripts for batch processing.
+A: Yes! Version 0.5.0+ includes batch processing mode. Use `--batch` with CIDR notation to analyze up to 1024 IPs in a single run. Supports both sequential and parallel processing modes.
+
+**Q: How do I scan an entire network?**
+A: Use batch mode with CIDR notation: `ip-sentinel --batch --json --output-folder results/ 192.168.1.0/24`. Add `--parallel` for faster processing of large networks.
 
 **Q: Does IP-Sentinel work offline?**
 A: Modules 1 and 2 work offline. Module 3 requires internet. Module 4 requires network access to enterprise systems.
 
 **Q: How is data stored?**
-A: In a SQLite database (default: `ip_analysis.db` in current directory).
+A: In a SQLite database (default: `ip_analysis.db` in current directory). You can specify a custom location with `--database` or disable storage with `--no-database`.
 
 **Q: Can I customize the classification rules?**
-A: Yes, use `--add-classification` and `--delete-classification` commands.
+A: Yes, use `--add-classification` and `--delete-classification` commands to manage custom IP range classifications.
 
 **Q: Is IP-Sentinel suitable for production use?**
-A: Yes, but review security considerations and test thoroughly in your environment.
+A: Yes, version 0.5.2 is production-ready with comprehensive testing (390 tests). Review security considerations and test thoroughly in your environment first.
 
 **Q: What about IPv6 support?**
-A: Full IPv6 support is included in all modules.
+A: Full IPv6 support is included in all modules, including batch processing mode.
+
+**Q: How fast is batch processing?**
+A: Sequential mode: ~5-30 seconds per IP. Parallel mode: 2-10x faster depending on CPU cores. A /24 network (254 IPs) takes ~30-60 minutes sequential or ~10-20 minutes parallel (4 cores).
+
+**Q: What's the maximum batch size?**
+A: 1024 IP addresses per batch run. This limit ensures reasonable processing times and resource usage. For larger networks, split into multiple batches.
+
+**Q: Can I use batch mode with application modules?**
+A: Yes! Combine `--batch` with `--netbox`, `--checkmk`, or `--openvas` to query enterprise systems for multiple IPs.
+
+**Q: What output formats are supported in batch mode?**
+A: JSON and HTML formats are supported in batch mode. Human-readable format is not available for batch processing (use it for single IP analysis).
+
+**Q: How do I monitor batch processing progress?**
+A: Batch mode includes real-time progress indicators showing overall progress (current IP / total IPs) and per-IP sub-progress for analysis stages.
 
 ## Acknowledgments
 
