@@ -70,7 +70,7 @@ A comprehensive Python console application for gathering intelligence about IP a
 1. **Clone the repository**:
 ```bash
 git clone <repository-url>
-cd ip-intelligence-analyzer
+cd ip-sentinel
 ```
 
 2. **Create and activate a virtual environment**:
@@ -562,7 +562,7 @@ Generates a styled HTML report with tables and formatting.
 1. **Clone and setup**:
 ```bash
 git clone <repository-url>
-cd ip-intelligence-analyzer
+cd ip-sentinel
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -649,7 +649,7 @@ pytest tests/property/ --hypothesis-show-statistics
 ### Project Structure
 
 ```
-ip-intelligence-analyzer/
+ip-sentinel/
 ├── src/ip_sentinel/              # Main application code
 │   ├── __init__.py
 │   ├── cli.py                # Command-line interface

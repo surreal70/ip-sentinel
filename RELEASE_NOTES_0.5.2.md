@@ -148,7 +148,7 @@ pip install --upgrade ip-sentinel
 
 # Or install from source
 git clone <repository-url>
-cd ip-intelligence-analyzer
+cd ip-sentinel
 git checkout v0.5.2
 pip install -e .
 ```
