@@ -1,6 +1,6 @@
-# Documentation
+tin# Documentation
 
-This directory contains detailed documentation for the IP Intelligence Analyzer.
+This directory contains detailed documentation for the IP Sentinel.
 
 ## Contents
 
