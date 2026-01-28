@@ -208,9 +208,6 @@ class TestThreadSafeProgressUpdates:
             try:
                 for _ in range(10):
                     tracker.update_overall_progress(idx, f"192.168.1.{idx}")
-                    tracker.start_stage(f"192.168.1.{idx}", "Classification")
-                    tracker.update_sub_progress(f"192.168.1.{idx}", "Classification", 0.5)
-                    tracker.complete_stage(f"192.168.1.{idx}", "Classification")
             except Exception as e:
                 errors.append(e)
 

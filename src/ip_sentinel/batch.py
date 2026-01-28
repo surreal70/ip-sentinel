@@ -56,20 +56,9 @@ class ProgressTracker:
     """
     Provides real-time progress feedback for batch operations.
 
-    This class manages both overall progress (current IP / total IPs) and
-    sub-progress for individual IP analysis stages. It supports both
-    sequential and parallel processing modes with thread-safe updates.
+    This class manages overall progress (current IP / total IPs) with
+    thread-safe updates for both sequential and parallel processing modes.
     """
-
-    # Analysis stages for sub-progress tracking
-    STAGES = [
-        "Classification",
-        "Local Info",
-        "Internet Info",
-        "Application Info",
-        "Formatting",
-        "Writing"
-    ]
 
     def __init__(self, total_ips: int, parallel: bool = False):
         """
@@ -83,8 +72,7 @@ class ProgressTracker:
         self.parallel = parallel
         self.current_ip = 0
         self.current_ip_address: Optional[str] = None
-        self.current_stage: Optional[str] = None
-        self.stage_progress: float = 0.0
+        self.completed_scans = 0
 
         # Thread safety for parallel mode
         if parallel:
@@ -119,102 +107,77 @@ class ProgressTracker:
         # Clamp current to valid range [0, total_ips]
         self.current_ip = max(0, min(current, self.total_ips))
         self.current_ip_address = ip_address
-        self.current_stage = None
-        self.stage_progress = 0.0
         self.display_progress()
 
-    def update_sub_progress(
-            self,
-            ip_address: str,
-            stage: str,
-            progress: float = 1.0):
+    def mark_completed(self):
         """
-        Update sub-progress for individual IP analysis stage.
-
-        Args:
-            ip_address: IP address being processed
-            stage: Analysis stage name
-            progress: Progress within stage (0.0 to 1.0)
+        Mark the current scan as completed (success or failure).
+        Increments the completed_scans counter.
         """
         if self._lock:
             with self._lock:
-                self._update_sub_progress_unsafe(ip_address, stage, progress)
+                self._mark_completed_unsafe()
         else:
-            self._update_sub_progress_unsafe(ip_address, stage, progress)
+            self._mark_completed_unsafe()
 
-    def _update_sub_progress_unsafe(
-            self,
-            ip_address: str,
-            stage: str,
-            progress: float = 1.0):
-        """Internal method to update sub-progress without locking."""
-        self.current_ip_address = ip_address
-        self.current_stage = stage
-        self.stage_progress = max(0.0, min(1.0, progress))
+    def _mark_completed_unsafe(self):
+        """Internal method to mark completion without locking."""
+        # Increment completed_scans with bounds checking
+        self.completed_scans = min(self.completed_scans + 1, self.total_ips)
         self.display_progress()
 
     def display_progress(self):
         """
         Display current progress to console.
 
-        Shows overall progress bar and sub-progress for current IP.
+        Shows two lines:
+        1. Overall progress: "Processing IP X/Y [=====>    ] Z%"
+        2. Completion: "Completed: X/Y scans"
         """
         if not sys.stdout.isatty():
             # Don't display progress bars in non-interactive mode
             return
 
-        # Clear previous progress display
-        if self._displayed:
-            # Move cursor up 2 lines and clear
-            sys.stdout.write('\033[2A\033[K')
+        try:
+            # Clear previous progress display (2 lines)
+            if self._displayed:
+                # Move cursor up 2 lines and clear
+                sys.stdout.write('\033[2A\033[K')
 
-        # Calculate overall progress percentage
-        overall_percent = (self.current_ip / self.total_ips * 100) if self.total_ips > 0 else 0
+            # Calculate overall progress percentage
+            overall_percent = (self.current_ip / self.total_ips * 100) if self.total_ips > 0 else 0
 
-        # Build overall progress bar
-        bar_width = 40
-        filled = int(bar_width * self.current_ip / self.total_ips) if self.total_ips > 0 else 0
-        bar = '=' * filled + '>' + ' ' * (bar_width - filled - 1)
+            # Build overall progress bar
+            bar_width = 40
+            filled = int(bar_width * self.current_ip / self.total_ips) if self.total_ips > 0 else 0
+            bar = '=' * filled + '>' + ' ' * (bar_width - filled - 1)
 
-        # Display overall progress
-        overall_line = (
-            f"Processing IP {self.current_ip}/{self.total_ips} "
-            f"[{bar}] {overall_percent:.1f}%"
-        )
-        sys.stdout.write(overall_line + '\n')
+            # Build overall progress line
+            overall_line = (
+                f"Processing IP {self.current_ip}/{self.total_ips} "
+                f"[{bar}] {overall_percent:.1f}%"
+            )
+            
+            # Build completion counter line
+            completion_line = f"Completed: {self.completed_scans}/{self.total_ips} scans"
 
-        # Display sub-progress if available
-        if self.current_ip_address and self.current_stage:
-            # Build stage progress indicators
-            stage_indicators = []
-            for stage in self.STAGES:
-                if stage == self.current_stage:
-                    # Current stage - show progress
-                    if self.stage_progress >= 1.0:
-                        stage_indicators.append(f"{stage} [====]")
-                    else:
-                        progress_chars = int(4 * self.stage_progress)
-                        stage_bar = '=' * progress_chars + '>' + ' ' * (3 - progress_chars)
-                        stage_indicators.append(f"{stage} [{stage_bar}]")
-                elif self.STAGES.index(stage) < self.STAGES.index(self.current_stage):
-                    # Completed stages
-                    stage_indicators.append(f"{stage} [====]")
-                else:
-                    # Future stages
-                    stage_indicators.append(f"{stage} [    ]")
+            # Write both lines with newlines
+            sys.stdout.write(overall_line + '\n')
+            sys.stdout.write(completion_line + '\n')
 
-            sub_line = f"  {self.current_ip_address}: {' '.join(stage_indicators[:3])}"
-            sys.stdout.write(sub_line + '\n')
-        else:
-            # No sub-progress, just show IP address
-            if self.current_ip_address:
-                sub_line = f"  {self.current_ip_address}: Starting analysis..."
-            else:
-                sub_line = "  Initializing..."
-            sys.stdout.write(sub_line + '\n')
+            self._displayed = True
 
-        sys.stdout.flush()
-        self._displayed = True
+        except Exception as e:
+            # Log warning on display failures without interrupting processing
+            logger.warning(f"Failed to display progress: {e}")
+
+        finally:
+            # Ensure flush is called if TTY
+            if sys.stdout.isatty():
+                try:
+                    sys.stdout.flush()
+                except Exception as e:
+                    logger.warning(f"Failed to flush stdout: {e}")
 
     def complete(self):
         """
@@ -229,26 +192,6 @@ class ProgressTracker:
             f"Progress tracking completed: {self.current_ip}/{self.total_ips} "
             f"IPs processed"
         )
-
-    def start_stage(self, ip_address: str, stage: str):
-        """
-        Mark the start of an analysis stage.
-
-        Args:
-            ip_address: IP address being processed
-            stage: Stage name
-        """
-        self.update_sub_progress(ip_address, stage, 0.0)
-
-    def complete_stage(self, ip_address: str, stage: str):
-        """
-        Mark the completion of an analysis stage.
-
-        Args:
-            ip_address: IP address being processed
-            stage: Stage name
-        """
-        self.update_sub_progress(ip_address, stage, 1.0)
 
 
 class FileOutputManager:
@@ -603,6 +546,27 @@ class BatchProcessor:
             results_lock = None
             counter_lock = None
 
+        # Suppress INFO logging during batch processing unless verbose mode is enabled
+        # This keeps progress indicators at the bottom of the terminal
+        verbose_mode = self.analyzer.config.verbose
+        original_log_level = None
+        original_root_level = None
+        
+        if not verbose_mode and sys.stdout.isatty():
+            # Save original log levels
+            original_log_level = logger.level
+            root_logger = logging.getLogger()
+            original_root_level = root_logger.level
+            
+            # Set to WARNING to suppress INFO messages from all loggers
+            logger.setLevel(logging.WARNING)
+            root_logger.setLevel(logging.WARNING)
+            
+            # Also suppress loggers from other modules that might interfere
+            for log_name in ['ip_sentinel.analyzer', 'ip_sentinel.modules', 'ip_sentinel.formatters']:
+                module_logger = logging.getLogger(log_name)
+                module_logger.setLevel(logging.WARNING)
+        
         logger.info(f"Processing {total_ips} IP addresses (parallel={self.parallel})...")
 
         if self.parallel:
@@ -618,6 +582,17 @@ class BatchProcessor:
 
         # Complete progress tracking
         self.progress_tracker.complete()
+        
+        # Restore original logging levels
+        if not verbose_mode and sys.stdout.isatty() and original_log_level is not None:
+            logger.setLevel(original_log_level)
+            root_logger = logging.getLogger()
+            root_logger.setLevel(original_root_level)
+            
+            # Restore other module loggers
+            for log_name in ['ip_sentinel.analyzer', 'ip_sentinel.modules', 'ip_sentinel.formatters']:
+                module_logger = logging.getLogger(log_name)
+                module_logger.setLevel(logging.NOTSET)  # Reset to inherit from parent
 
         return BatchResult(
             total_ips=total_ips,
@@ -675,6 +650,9 @@ class BatchProcessor:
                 logger.error(error_msg)
                 errors[ip_str] = str(e)
                 failed += 1
+                
+                # Mark as completed even on failure
+                self.progress_tracker.mark_completed()
 
         return successful, failed, results, errors, output_files
 
@@ -754,6 +732,9 @@ class BatchProcessor:
                     # Thread-safe counter update
                     with counter_lock:
                         failed += 1
+                    
+                    # Mark as completed even on failure
+                    self.progress_tracker.mark_completed()
 
         return successful, failed, results, errors, output_files
 
@@ -775,28 +756,18 @@ class BatchProcessor:
         Raises:
             Exception: If processing fails
         """
-        # Stage 1: Classification
-        self.progress_tracker.start_stage(ip_str, "Classification")
-        # Analyze IP (classification happens inside)
+        # Analyze IP
         result = self.analyzer.analyze(ip_str)
-        self.progress_tracker.complete_stage(ip_str, "Classification")
 
-        # Stage 2-4: Analysis modules (handled inside analyzer)
-        # We'll mark them as complete after analysis
-        self.progress_tracker.complete_stage(ip_str, "Local Info")
-        self.progress_tracker.complete_stage(ip_str, "Internet Info")
-        self.progress_tracker.complete_stage(ip_str, "Application Info")
-
-        # Stage 5: Formatting
-        self.progress_tracker.start_stage(ip_str, "Formatting")
+        # Format output
         formatter = self._get_formatter()
         formatted_output = formatter.format_result(result)
-        self.progress_tracker.complete_stage(ip_str, "Formatting")
 
-        # Stage 6: Writing
-        self.progress_tracker.start_stage(ip_str, "Writing")
+        # Write result
         self.file_manager.write_result(ip, formatted_output)
-        self.progress_tracker.complete_stage(ip_str, "Writing")
+
+        # Mark as completed
+        self.progress_tracker.mark_completed()
 
         return result, formatted_output
 
@@ -830,26 +801,18 @@ class BatchProcessor:
 
         logger.info(f"Processing IP {idx}/{total_ips}: {ip_str} (parallel)")
 
-        # Stage 1: Classification
-        self.progress_tracker.start_stage(ip_str, "Classification")
+        # Analyze IP
         result = self.analyzer.analyze(ip_str)
-        self.progress_tracker.complete_stage(ip_str, "Classification")
 
-        # Stage 2-4: Analysis modules (handled inside analyzer)
-        self.progress_tracker.complete_stage(ip_str, "Local Info")
-        self.progress_tracker.complete_stage(ip_str, "Internet Info")
-        self.progress_tracker.complete_stage(ip_str, "Application Info")
-
-        # Stage 5: Formatting
-        self.progress_tracker.start_stage(ip_str, "Formatting")
+        # Format output
         formatter = self._get_formatter()
         formatted_output = formatter.format_result(result)
-        self.progress_tracker.complete_stage(ip_str, "Formatting")
 
-        # Stage 6: Writing (thread-safe via FileOutputManager)
-        self.progress_tracker.start_stage(ip_str, "Writing")
+        # Write result (thread-safe via FileOutputManager)
         self.file_manager.write_result(ip, formatted_output)
-        self.progress_tracker.complete_stage(ip_str, "Writing")
+
+        # Mark as completed
+        self.progress_tracker.mark_completed()
 
         return result, formatted_output
 

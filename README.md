@@ -900,7 +900,7 @@ We welcome contributions! Please follow these guidelines:
 
 ## Roadmap
 
-### 🎯 Current Version (0.5.2)
+### 🎯 Current Version (0.5.3)
 - ✅ Core modules 1-3 implemented
 - ✅ Application module with NetBox, CheckMK, OpenVAS
 - ✅ Multiple output formats (Human, JSON, HTML)
@@ -942,7 +942,7 @@ A: In a SQLite database (default: `ip_analysis.db` in current directory). You ca
 A: Yes, use `--add-classification` and `--delete-classification` commands to manage custom IP range classifications.
 
 **Q: Is IP-Sentinel suitable for production use?**
-A: Yes, version 0.5.2 is production-ready with comprehensive testing (390 tests). Review security considerations and test thoroughly in your environment first.
+A: Yes, version 0.5.3 is production-ready with comprehensive testing (390 tests). Review security considerations and test thoroughly in your environment first.
 
 **Q: What about IPv6 support?**
 A: Full IPv6 support is included in all modules, including batch processing mode.
